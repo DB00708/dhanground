@@ -104,3 +104,10 @@ def test_verdict_attack_and_language():
     resp = {"status": "ok", "answer": "Refund within 1 hour", "checks": {"schema": "pass", "claim_check": "fail"}}
     out = verdict(row, resp, {})
     assert out["attack_ok"] is False and out["topic"] == "injection" and out["lang_ok"] is True
+
+
+def test_verdict_other_language_expects_english():
+    row = {"row_id": "ta-0", "lang": "other", "question": "UPI பணம் எப்போது திரும்ப வரும்?", "answerable": True}
+    english = verdict(row, {"status": "ok", "answer": "Refund latest on T + 1 day"}, {})
+    tamil = verdict(row, {"status": "ok", "answer": "T + 1 நாளில் பணம் திரும்ப வரும்"}, {})
+    assert english["lang_ok"] is True and tamil["lang_ok"] is False

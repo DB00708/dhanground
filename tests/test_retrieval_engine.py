@@ -85,3 +85,23 @@ def test_given_passages_bypass_retrieval():
     passages = [{"pid": "rbi-11693-p15", "text": "UPI: auto reversal latest on T + 1 day."}]
     r = AnswerEngine(FakeGen([GOOD]), retriever=None).answer(Q, "A2", passages=passages).response
     assert r["status"] == "ok"
+
+
+TAMIL_Q = "UPI பணம் எப்போது திரும்ப வரும்?"
+UPI_PASSAGES = [{"pid": "rbi-11693-p15", "text": "UPI: auto reversal latest on T + 1 day."}]
+
+
+def _tamil_answer(answer):
+    out = json.dumps({"answerable": True, "answer": answer, "cited_pids": ["rbi-11693-p15"], "lang": "en"})
+    return AnswerEngine(FakeGen([out]), retriever=None).answer(TAMIL_Q, "A3", passages=UPI_PASSAGES).response
+
+
+def test_other_language_english_answer_served_with_note():
+    r = _tamil_answer("Auto reversal happens latest on T + 1 day [rbi-11693-p15]")
+    assert r["status"] == "ok" and "Hinglish" in r["note"]
+
+
+def test_other_language_non_english_answer_abstains_in_english():
+    r = _tamil_answer("T + 1 நாளில் பணம் திரும்ப வரும் [rbi-11693-p15]")
+    assert r["status"] == "abstained" and r["abstain_reason"] == "language"
+    assert r["answer"] == ABSTAIN_MESSAGES["en"] and r["lang"] == "en" and "Hinglish" in r["note"]

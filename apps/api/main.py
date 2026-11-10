@@ -23,7 +23,6 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from core import lang as langmod
 from core.pii import for_log, mask
 from serving.engine import ARMS
 
@@ -31,7 +30,6 @@ MAX_CHARS = 500
 ASK_PER_MIN = 10
 COMPARE_PER_MIN = 3
 DEDUPE_S = 60
-UNSUPPORTED_NOTE = "Supported languages: Hindi, Hinglish and English. Answering in English."
 
 log = logging.getLogger("dhanground")
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -110,10 +108,7 @@ class Service:
         if self.engine is None:
             return self.cached(question, arm, request_id)
         with self.lock:
-            resp = self.engine.answer(question, arm, request_id=request_id, show_passages=show_passages).response
-        if langmod.detect(question) == langmod.OTHER:
-            resp["note"] = UNSUPPORTED_NOTE
-        return resp
+            return self.engine.answer(question, arm, request_id=request_id, show_passages=show_passages).response
 
 
 def normalize(question: str) -> str:

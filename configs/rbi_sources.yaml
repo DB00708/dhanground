@@ -1,0 +1,44 @@
+# Allowlist of public RBI consumer documents. Only rbi.org.in hosts are accepted by the ingester.
+# Entries with `file` are PDFs on rbidocs.rbi.org.in, which shows a CAPTCHA to scripts:
+# open the url in a browser, save the PDF at `file` (relative to the repo root), then run ingest.
+# Snapshot: RBI website, Nov 2026. Master Directions are the consolidated 2025-26 versions.
+# `date` is the "updated as on" date where RBI lists one, else the year in the title.
+documents:
+  # Circulars (HTML)
+  - doc_id: rbi-11693
+    title: Harmonisation of Turn Around Time (TAT) and customer compensation for failed transactions using authorised Payment Systems
+    url: https://www.rbi.org.in/scripts/NotificationUser.aspx?Id=11693
+    date: "2019-09-20"
+    topics: [upi, atm, cards, imps]
+
+  # FAQs (HTML)
+  - {doc_id: faq-153, title: "FAQs: Reserve Bank - Integrated Ombudsman Scheme, 2026", url: "https://www.rbi.org.in/Scripts/FAQDisplay.aspx?Id=153", date: "2026-07-01", topics: [ombudsman]}
+  - {doc_id: faq-173, title: "FAQs on Master Direction on KYC", url: "https://www.rbi.org.in/Scripts/FAQDisplay.aspx?Id=173", date: "2025-06-09", topics: [kyc]}
+  - {doc_id: faq-75, title: "FAQs: ATM / White Label ATM", url: "https://www.rbi.org.in/Scripts/FAQDisplay.aspx?Id=75", date: "2025-07-04", topics: [atm]}
+  - {doc_id: faq-60, title: "FAQs: National Electronic Funds Transfer (NEFT) System", url: "https://www.rbi.org.in/Scripts/FAQDisplay.aspx?Id=60", date: "2024-09-02", topics: [neft]}
+  - {doc_id: faq-65, title: "FAQs: Real Time Gross Settlement (RTGS) System", url: "https://www.rbi.org.in/Scripts/FAQDisplay.aspx?Id=65", date: "2026-10-14", topics: [rtgs]}
+  - {doc_id: faq-103, title: "FAQs: Card Transactions", url: "https://www.rbi.org.in/Scripts/FAQDisplay.aspx?Id=103", date: "2023-05-11", topics: [cards]}
+  - {doc_id: faq-129, title: "FAQs: Device based Tokenisation - Card Transactions", url: "https://www.rbi.org.in/Scripts/FAQDisplay.aspx?Id=129", date: "2023-05-11", topics: [cards]}
+  - {doc_id: faq-135, title: "FAQs: Cash Withdrawal Facility at Point of Sale (PoS) Terminals", url: "https://www.rbi.org.in/Scripts/FAQDisplay.aspx?Id=135", date: "2022-11-22", topics: [cards, atm]}
+  - {doc_id: faq-126, title: "FAQs: Prepaid Payment Instruments (PPIs)", url: "https://www.rbi.org.in/Scripts/FAQDisplay.aspx?Id=126", date: "2022-11-22", topics: [ppi]}
+  - {doc_id: faq-175, title: "FAQs on Cheque Clearing", url: "https://www.rbi.org.in/Scripts/FAQDisplay.aspx?Id=175", date: "2026-01-07", topics: [cheque]}
+  - {doc_id: faq-64, title: "FAQs: Deposit Insurance", url: "https://www.rbi.org.in/Scripts/FAQDisplay.aspx?Id=64", date: "2008-11-25", topics: [deposits]}
+  - {doc_id: faq-165, title: "FAQs: Depositor Education and Awareness (DEA) Fund Scheme, 2014", url: "https://www.rbi.org.in/Scripts/FAQDisplay.aspx?Id=165", date: "2024-03-05", topics: [deposits]}
+  - {doc_id: faq-166, title: "FAQs: UDGAM Portal", url: "https://www.rbi.org.in/Scripts/FAQDisplay.aspx?Id=166", date: "2024-03-05", topics: [deposits]}
+  - {doc_id: faq-150, title: "FAQs: Education Loan", url: "https://www.rbi.org.in/Scripts/FAQDisplay.aspx?Id=150", date: "2023-10-10", topics: [loans]}
+  - {doc_id: faq-169, title: "FAQs: Digital Rupee (e-Rupee)", url: "https://www.rbi.org.in/Scripts/FAQDisplay.aspx?Id=169", date: "2026-10-01", topics: [digital]}
+  - {doc_id: faq-136, title: "FAQs: Indian Currency", url: "https://www.rbi.org.in/Scripts/FAQDisplay.aspx?Id=136", date: "2025-04-15", topics: [currency]}
+
+  # Master Directions (PDF, download by hand)
+  - {doc_id: md-13140, title: "RBI (Commercial Banks - Responsible Business Conduct) Directions, 2025", url: "https://rbidocs.rbi.org.in/rdocs/notification/PDFs/170MD.PDF", file: sources/pdf/md-13140.pdf, date: "2026-10-01", topics: [customer-service, fraud, charges, recovery]}
+  - {doc_id: md-13141, title: "RBI (Commercial Banks - Know Your Customer) Directions, 2025", url: "https://rbidocs.rbi.org.in/rdocs/notification/PDFs/169MD.PDF", file: sources/pdf/md-13141.pdf, date: "2026-10-01", topics: [kyc]}
+  - {doc_id: md-13155, title: "RBI (Commercial Banks - Credit Cards and Debit Cards: Issuance and Conduct) Directions, 2025", url: "https://rbidocs.rbi.org.in/rdocs/notification/PDFs/155MD.PDF", file: sources/pdf/md-13155.pdf, date: "2026-10-01", topics: [cards]}
+  - {doc_id: md-13156, title: "RBI (Commercial Banks - Credit Facilities) Directions, 2025", url: "https://rbidocs.rbi.org.in/rdocs/notification/PDFs/154MD.PDF", file: sources/pdf/md-13156.pdf, date: "2026-10-01", topics: [loans]}
+  - {doc_id: md-13157, title: "RBI (Commercial Banks - Interest Rate on Deposits) Directions, 2025", url: "https://rbidocs.rbi.org.in/rdocs/notification/PDFs/153MD.PDF", file: sources/pdf/md-13157.pdf, date: "2026-10-01", topics: [deposits]}
+  - {doc_id: md-13149, title: "RBI (Commercial Banks - Interest Rates on Advances) Directions, 2025", url: "https://rbidocs.rbi.org.in/rdocs/notification/PDFs/161MD.PDF", file: sources/pdf/md-13149.pdf, date: "2025", topics: [loans]}
+  - {doc_id: md-13642, title: "RBI (Commercial Banks - Digital Payment Security Controls) Directions, 2026", url: "https://rbidocs.rbi.org.in/rdocs/notification/PDFs/411MD1918998D1AD74F159D57664FB10E053F.PDF", file: sources/pdf/md-13642.pdf, date: "2026-10-01", topics: [fraud, digital]}
+  - {doc_id: md-13374, title: "Digital Payments - E-mandate Framework, 2026", url: "https://rbidocs.rbi.org.in/rdocs/notification/PDFs/396MDD002E435ECA145509929FC3ACBCFD0E9.PDF", file: sources/pdf/md-13374.pdf, date: "2026", topics: [mandate]}
+  - {doc_id: md-12156, title: "Master Directions on Prepaid Payment Instruments (PPIs)", url: "https://rbidocs.rbi.org.in/rdocs/notification/PDFs/82MDPPIS2708202181CF0A6FCD1B47B88CAE8E92A228B160.PDF", file: sources/pdf/md-12156.pdf, date: "2026-09-30", topics: [ppi]}
+  - {doc_id: md-13271, title: "RBI (Commercial Banks - Internal Ombudsman) Directions, 2026", url: "https://rbidocs.rbi.org.in/rdocs/notification/PDFs/380MD14012026DAD56B73DC944F02AEA4530EC779AD7F.PDF", file: sources/pdf/md-13271.pdf, date: "2026-01-14", topics: [ombudsman]}
+  - {doc_id: md-12616, title: "RBI (Bharat Bill Payment System) Directions, 2024", url: "https://rbidocs.rbi.org.in/rdocs/notification/PDFs/111MDONBBPS87BA4103916D4B21AE117F1443020ADB.PDF", file: sources/pdf/md-12616.pdf, date: "2024", topics: [bbps]}
+  - {doc_id: ios-2026, title: "Reserve Bank - Integrated Ombudsman Scheme, 2026", url: "https://rbidocs.rbi.org.in/rdocs/content/pdfs/SCHEME16012026_A.pdf", file: sources/pdf/ios-2026.pdf, date: "2026-01-16", topics: [ombudsman]}

@@ -1,0 +1,5 @@
+# Adapter per arm: local path or HF repo id ({arm}-s{seed}-{git_sha}). A0 is the base model with adapters off.
+adapters:
+  A1: null
+  A2: null
+  A3: null

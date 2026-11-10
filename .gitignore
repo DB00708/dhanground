@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+.env
+corpus/
+data/
+checkpoints/
+wandb/
+index/
+sources/pdf/
+evals/results/*_verdicts.jsonl
+.claude/

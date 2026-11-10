@@ -1,0 +1,12 @@
+# CPU side: ingest, splits, BM25 retrieval, curation gates, API, tests.
+pydantic==2.14.3
+PyYAML==6.0.3
+requests==2.34.2
+trafilatura==2.3.1
+pymupdf
+rank-bm25==0.2.2
+numpy==2.4.6
+fastapi==0.162.2
+httpx==0.28.1
+uvicorn
+pytest==9.2.0

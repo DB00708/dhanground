@@ -1,0 +1,6 @@
+# Split by RBI document. Row targets: train 3,000, dev 300, test 500 (100 unanswerable, 100 adversarial).
+seed: 0
+doc_ratios:
+  train: 0.76
+  dev: 0.08
+  test: 0.16

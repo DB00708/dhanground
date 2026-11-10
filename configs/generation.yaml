@@ -1,0 +1,14 @@
+# Raw row targets per split, before curation. Curation drops some rows; A2 needs n_rows curated train rows.
+targets:
+  train: 5000
+  dev: 400
+  test: 700
+languages:          # share of rows per language
+  hi-Latn: 0.4
+  hi-Deva: 0.3
+  en: 0.3
+unanswerable_rate: 0.2
+adversarial_rate: 0.05    # answerable questions with an injected instruction; gold answer stays grounded
+questions_per_call: 2
+concurrency: 8
+seed: 0

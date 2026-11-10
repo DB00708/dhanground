@@ -1,0 +1,29 @@
+# One variable per arm: only data or objective differs. A1 and A2 use the same row count N.
+base_model: CohereLabs/tiny-aya-fire
+fallback_base_model: CohereLabs/tiny-aya-global
+n_rows: 3000
+
+arms:
+  A0:
+    name: base
+    data: null
+    objective: null
+    seeds: [0]
+  A1:
+    name: raw-sft
+    data: data/arms/A1_raw.jsonl
+    objective: sft
+    seeds: [0, 1, 2]
+  A2:
+    name: curated-sft
+    data: data/arms/A2_curated.jsonl
+    objective: sft
+    seeds: [0, 1, 2]
+  A3:
+    name: curated-sft-dpo
+    init_from: A2
+    data: data/arms/A3_pairs.jsonl
+    objective: dpo
+    seeds: [0]
+
+adapter_name: "{arm}-s{seed}-{git_sha}"

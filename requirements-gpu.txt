@@ -1,0 +1,16 @@
+# L4 box: install on top of requirements.txt, then `pip freeze > requirements.lock` and commit the lock.
+-r requirements.txt
+aligntune==0.1.33
+curatorkit[all]==0.1.24
+auditkit==1.1.6
+torch
+transformers
+peft
+trl
+datasets
+accelerate
+huggingface_hub
+sentence-transformers
+litellm
+gradio
+matplotlib

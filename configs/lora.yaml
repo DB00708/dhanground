@@ -1,0 +1,21 @@
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules: all-linear
+
+precision: bf16   # never 4-bit training, never T4 (fp16 GradScaler crash)
+
+sft:
+  epochs: 2
+  lr: 2.0e-4
+  scheduler: cosine
+  max_len: 3072
+  effective_batch_size: 16
+  checkpoint_every_steps: 200
+
+dpo:
+  epochs: 1
+  lr: 5.0e-6
+  beta: 0.1
+  checkpoint_every_steps: 200

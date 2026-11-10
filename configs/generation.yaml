@@ -10,5 +10,15 @@ languages:          # share of rows per language
 unanswerable_rate: 0.2
 adversarial_rate: 0.05    # answerable questions with an injected instruction; gold answer stays grounded
 questions_per_call: 2
+# Generate questions only from retail-customer content (retrieval still indexes everything).
+# Chapters are tagged by core/relevance.py; contents pages are always skipped.
+exclude_chapters:
+  md-13156:   # Credit Facilities: keep I definitions, III digital lending, IV gold/silver loans,
+              # VI microfinance, XIII loans against financial assets, XVII miscellaneous
+    [II, IIA, VA, VII, VIII, IX, X, XI, XII, XIIIA, XIV, XV, XVI, XVIII]
+keep_spans:   # sections inside an excluded chapter that customers do ask about (by heading text)
+  md-13156:
+    - {from: "B. Housing Finance", to: "C. Loans and advances to Commercial Real Estate"}   # home loans: LTV, quantum, disbursal
+exclude_terms: []   # case-insensitive substrings; a passage containing one is skipped
 concurrency: 8
 seed: 0

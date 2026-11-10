@@ -1,6 +1,41 @@
 import pytest
 
-from core.splits import LeakageError, check_no_overlap, split_docs
+from core.splits import LeakageError, check_no_overlap, split_docs, split_docs_stratified
+
+CORE = ["upi", "atm", "kyc", "fraud"]
+TOPICS = {
+    "tat": ["upi", "atm"], "ppi": ["upi", "fraud"], "mandate": ["upi"], "atm-faq": ["atm"],
+    "kyc-md": ["kyc"], "kyc-faq": ["kyc"], "fraud-md": ["fraud"], "huge": ["fraud", "kyc"],
+    "loan": ["loans"], "currency": ["currency"], "neft": ["neft"], "deposit": ["deposits"],
+}
+SIZES = {"tat": 27, "ppi": 212, "mandate": 15, "atm-faq": 32, "kyc-md": 404, "kyc-faq": 41,
+         "fraud-md": 107, "huge": 619, "loan": 9, "currency": 90, "neft": 34, "deposit": 25}
+PR = {"train": 0.76, "dev": 0.08, "test": 0.16}
+
+
+def test_stratified_test_covers_core_topics_and_train_keeps_them():
+    s = split_docs_stratified(TOPICS, SIZES, CORE, PR)
+    for split in ("train", "test"):
+        assert {t for d in s[split] for t in TOPICS[d]} >= set(CORE), split
+
+
+def test_stratified_respects_passage_budget_and_partitions():
+    s = split_docs_stratified(TOPICS, SIZES, CORE, PR)
+    total = sum(SIZES.values())
+    for split in ("test", "dev"):
+        assert sum(SIZES[d] for d in s[split]) <= PR[split] * total
+    assert "huge" in s["train"] and "kyc-md" in s["train"]
+    assert sorted(s["train"] + s["dev"] + s["test"]) == sorted(TOPICS)
+
+
+def test_stratified_never_moves_a_topics_only_doc():
+    s = split_docs_stratified({"only-upi": ["upi"], "a": ["x"], "b": ["y"], "c": ["z"]},
+                              {"only-upi": 5, "a": 5, "b": 5, "c": 5}, ["upi"], {"train": 0.5, "dev": 0.25, "test": 0.25})
+    assert "only-upi" in s["train"]
+
+
+def test_stratified_is_deterministic():
+    assert split_docs_stratified(TOPICS, SIZES, CORE, PR) == split_docs_stratified(dict(reversed(TOPICS.items())), SIZES, CORE, PR)
 
 DOCS = [f"rbi-{i}" for i in range(50)]
 RATIOS = {"train": 0.76, "dev": 0.08, "test": 0.16}

@@ -33,6 +33,56 @@ def split_docs(doc_ids: list[str], ratios: dict[str, float], seed: int = 0) -> d
     }
 
 
+def split_docs_stratified(
+    doc_topics: dict[str, list[str]],
+    doc_sizes: dict[str, int],
+    core_topics: list[str],
+    ratios: dict[str, float],
+    seed: int = 0,
+) -> dict[str, list[str]]:
+    """Split by document, sized by passages, so held-out splits cover the core topics.
+
+    1. Test, then dev: for each core topic not yet covered, move in one document carrying it,
+       but only if another document with that topic stays in train and the document fits the
+       split's passage budget. Rarest topics are placed first; the smallest eligible document wins.
+    2. Top up test, then dev, toward their passage budgets with documents that still fit.
+    Deterministic for a given input and seed.
+    """
+    if abs(sum(ratios.values()) - 1.0) > 1e-6:
+        raise ValueError(f"ratios must sum to 1, got {ratios}")
+    total = sum(doc_sizes[d] for d in doc_topics)
+    train = set(doc_topics)
+    held: dict[str, set[str]] = {"test": set(), "dev": set()}
+    order = sorted(doc_topics, key=lambda d: _key(seed, d))
+
+    def size(split: str) -> int:
+        return sum(doc_sizes[d] for d in held[split])
+
+    def fits(split: str, d: str) -> bool:
+        return size(split) + doc_sizes[d] <= ratios[split] * total
+
+    def train_keeps(d: str) -> bool:
+        return all(any(t in doc_topics[o] for o in train - {d}) for t in doc_topics[d] if t in core_topics)
+
+    rarity = sorted(core_topics, key=lambda t: (sum(t in ts for ts in doc_topics.values()), t))
+    for split in ("test", "dev"):
+        for topic in rarity:
+            if any(topic in doc_topics[d] for d in held[split]):
+                continue
+            eligible = [d for d in order if d in train and topic in doc_topics[d] and fits(split, d) and train_keeps(d)]
+            if eligible:
+                d = min(eligible, key=lambda x: doc_sizes[x])  # smallest first leaves room for other topics
+                train.discard(d)
+                held[split].add(d)
+        for d in order:
+            if d in train and fits(split, d) and train_keeps(d) and size(split) < ratios[split] * total:
+                train.discard(d)
+                held[split].add(d)
+    if not held["test"] or not held["dev"]:
+        raise ValueError("too few documents to fill test and dev")
+    return {"test": sorted(held["test"]), "dev": sorted(held["dev"]), "train": sorted(train)}
+
+
 def normalize_question(q: str) -> str:
     return re.sub(r"[^\w]+", " ", q.lower()).strip()
 

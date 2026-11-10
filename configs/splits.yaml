@@ -1,6 +1,8 @@
-# Split by RBI document. Row targets: train 3,000, dev 300, test 500 (100 unanswerable, 100 adversarial).
+# Split by RBI document (never by row), sized by passages, so dev and test cover the topics customers ask about.
+# Row targets: train 3,000, dev 300, test 500 (100 unanswerable, 100 adversarial).
 seed: 0
-doc_ratios:
+passage_ratios:
   train: 0.76
   dev: 0.08
   test: 0.16
+core_topics: [upi, atm, cards, kyc, ombudsman, fraud]

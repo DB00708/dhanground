@@ -48,6 +48,7 @@ class Gates(BaseModel):
 class Provenance(BaseModel):
     source_doc: str
     span_sha256: str
+    span_sha256s: list[str] | None = None   # multi-passage rows: one hash per source_pids entry
     generator: str
     gates: Gates | None = None
 
@@ -71,6 +72,8 @@ class TrainingRow(BaseModel):
     split: Literal["train", "dev", "test"]
     kind: Literal["answerable", "unanswerable", "adversarial"] = "answerable"
     source_pid: str | None = None
+    source_pids: list[str] | None = None   # multi-passage rows: every gold passage; source_pid is the first
+    noise: Literal["typo"] | None = None
 
 
 _FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$")

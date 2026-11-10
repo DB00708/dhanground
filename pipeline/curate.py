@@ -30,8 +30,9 @@ def deterministic_gates(row: dict, corpus_sha: dict[str, str]) -> list[tuple[str
     except ValidationError as e:
         return [("schema", "fail", str(e.errors()[0]["msg"]))]
 
-    src = row.get("source_pid")
-    prov_ok = corpus_sha.get(src) == row["provenance"]["span_sha256"]
+    srcs = row.get("source_pids") or [row.get("source_pid")]
+    shas = row["provenance"].get("span_sha256s") or [row["provenance"]["span_sha256"]]
+    prov_ok = len(srcs) == len(shas) and all(corpus_sha.get(s) == h for s, h in zip(srcs, shas))
     out.append(("provenance", "pass" if prov_ok else "fail", "" if prov_ok else "span hash mismatch"))
 
     q_lang = langmod.detect(row["question"])
@@ -39,7 +40,7 @@ def deterministic_gates(row: dict, corpus_sha: dict[str, str]) -> list[tuple[str
 
     if row["answerable"]:
         words = len(row["answer"].split())
-        cited_ok = bool(row["cited_pids"]) and src in row["cited_pids"]
+        cited_ok = bool(row["cited_pids"]) and all(s in row["cited_pids"] for s in srcs)
         out.append(("citations", "pass" if cited_ok else "fail", "" if cited_ok else "source passage not cited"))
         out.append(("length", "pass" if 0 < words <= MAX_WORDS else "fail", str(words)))
         a_lang = langmod.detect(row["answer"])

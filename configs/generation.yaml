@@ -9,6 +9,8 @@ languages:          # share of rows per language
   en: 0.3
 unanswerable_rate: 0.2
 adversarial_rate: 0.05    # answerable questions with an injected instruction; gold answer stays grounded
+typo_rate: 0.1            # hi-Latn questions given phone-typing noise (wapas->wpas, nahi->nhi); answer unchanged
+multi_passage_rate: 0.1   # answerable jobs that pair a paragraph with the next one; the answer cites both
 questions_per_call: 2
 # Generate questions only from retail-customer content (retrieval still indexes everything).
 # Chapters are tagged by core/relevance.py; contents pages are always skipped.

@@ -5,6 +5,7 @@ Runs through plain TRL (the design's labeled DPO fallback): the A2 adapter is lo
 hot-swaps with A1 and A2 at serve time.
 
 Usage: python -m adapters.aligntune_dpo --a2 checkpoints/A2-s0-<sha> --pairs data/arms/A3_pairs.jsonl [--hub-org org]
+Resume after a dead session: add --resume-from-hub <org>/dhanground-A3-s0-<sha>.
 """
 from __future__ import annotations
 
@@ -13,7 +14,7 @@ import json
 import shutil
 from pathlib import Path
 
-from adapters.common import CheckpointSync, adapter_name, load_configs, push_adapter
+from adapters.common import CheckpointSync, adapter_name, load_configs, push_adapter, restore_latest_checkpoint
 
 
 def main() -> None:
@@ -22,6 +23,8 @@ def main() -> None:
     ap.add_argument("--pairs", type=Path, default=Path("data/arms/A3_pairs.jsonl"))
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--hub-org", default=None)
+    ap.add_argument("--resume-from-hub", default=None, metavar="REPO_ID",
+                    help="restore the latest checkpoint from this Hub repo and resume")
     a = ap.parse_args()
 
     import torch
@@ -34,7 +37,10 @@ def main() -> None:
     base, dpo = arms["base_model"], lora["dpo"]
     name = adapter_name("A3", a.seed)
     out = Path("checkpoints") / name
-    repo = f"{a.hub_org}/dhanground-{name}" if a.hub_org else None
+    repo = a.resume_from_hub or (f"{a.hub_org}/dhanground-{name}" if a.hub_org else None)
+    restored = restore_latest_checkpoint(a.resume_from_hub, out) if a.resume_from_hub else None
+    if a.resume_from_hub:
+        print(f"resuming from {restored}" if restored else f"no complete checkpoint in {a.resume_from_hub}; starting fresh")
 
     rows = [json.loads(l) for l in a.pairs.open(encoding="utf-8")]
     ds = Dataset.from_list([{"prompt": r["prompt"], "chosen": r["chosen"], "rejected": r["rejected"]} for r in rows])
@@ -49,7 +55,7 @@ def main() -> None:
         max_length=lora["sft"]["max_len"] + 384, save_steps=dpo["checkpoint_every_steps"], logging_steps=5,
         report_to="none", model_adapter_name="train", ref_adapter_name="reference", gradient_checkpointing=True,
     )
-    with CheckpointSync(out, repo):
+    with CheckpointSync(out, repo, already_sent=restored):
         trainer = DPOTrainer(model=model, args=args, train_dataset=ds, processing_class=tok)
         trainer.train(resume_from_checkpoint=any(out.glob("checkpoint-*")) or None)
 

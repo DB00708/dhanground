@@ -1,6 +1,8 @@
 """Shared bits for training adapters: configs, adapter naming, checkpoint sync to the HF Hub."""
 from __future__ import annotations
 
+import re
+import shutil
 import subprocess
 import threading
 from pathlib import Path
@@ -28,9 +30,9 @@ def adapter_name(arm: str, seed: int) -> str:
 class CheckpointSync:
     """Uploads each new checkpoint-* folder under output_dir to the Hub, so a dead GPU session can resume."""
 
-    def __init__(self, output_dir: Path, repo_id: str | None, every_s: int = 60):
+    def __init__(self, output_dir: Path, repo_id: str | None, every_s: int = 60, already_sent: Path | None = None):
         self.output_dir, self.repo_id, self.every_s = Path(output_dir), repo_id, every_s
-        self.sent: set[str] = set()
+        self.sent: set[str] = {Path(already_sent).name} if already_sent else set()
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._loop, daemon=True)
 
@@ -60,6 +62,35 @@ class CheckpointSync:
                 continue
             upload_folder(repo_id=self.repo_id, folder_path=str(ckpt), path_in_repo=f"checkpoints/{ckpt.name}")
             self.sent.add(ckpt.name)
+
+
+_CKPT_STATE = re.compile(r"^checkpoints/checkpoint-(\d+)/trainer_state\.json$")
+
+
+def latest_checkpoint_step(repo_files: list[str]) -> int | None:
+    """Highest N with checkpoints/checkpoint-N/trainer_state.json present (a half-uploaded folder lacks it)."""
+    steps = [int(m.group(1)) for f in repo_files if (m := _CKPT_STATE.match(f))]
+    return max(steps) if steps else None
+
+
+def restore_latest_checkpoint(repo_id: str, output_dir: Path) -> Path | None:
+    """Download the newest complete Hub checkpoint into output_dir/checkpoint-N; None if the repo has none."""
+    from huggingface_hub import list_repo_files, snapshot_download
+
+    step = latest_checkpoint_step(list_repo_files(repo_id))
+    if step is None:
+        return None
+    output_dir = Path(output_dir)
+    dst = output_dir / f"checkpoint-{step}"
+    if (dst / "trainer_state.json").exists():
+        return dst
+    staging = output_dir / ".hub_restore"
+    snapshot_download(repo_id=repo_id, local_dir=str(staging), allow_patterns=[f"checkpoints/checkpoint-{step}/*"])
+    if dst.exists():
+        shutil.rmtree(dst)
+    shutil.move(str(staging / "checkpoints" / dst.name), str(dst))
+    shutil.rmtree(staging, ignore_errors=True)
+    return dst
 
 
 def push_adapter(folder: Path, repo_id: str) -> None:

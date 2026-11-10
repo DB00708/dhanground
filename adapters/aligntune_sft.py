@@ -5,6 +5,9 @@ render serving uses, so train and serve see byte-identical prompts.
 Fallback when AlignTune breaks on the template: --backend trl (plain TRL, completion-only loss).
 
 Usage: python -m adapters.aligntune_sft --arm A2 --seed 0 [--hub-org your-org] [--backend aligntune|trl]
+Resume (e.g. on Kaggle after HF credits run out): add --backend trl --resume-from-hub <org>/dhanground-A2-s0-<sha>.
+AlignTune 0.1.33 cannot resume: its SFT train() builds the HF trainer internally and calls .train() with no
+resume_from_checkpoint, so only the trl backend resumes.
 """
 from __future__ import annotations
 
@@ -12,7 +15,7 @@ import argparse
 import json
 from pathlib import Path
 
-from adapters.common import CheckpointSync, adapter_name, load_configs, push_adapter
+from adapters.common import CheckpointSync, adapter_name, load_configs, push_adapter, restore_latest_checkpoint
 
 
 def render_rows(tokenizer, src: Path, dst_dir: Path) -> Path:
@@ -91,16 +94,26 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--backend", choices=["aligntune", "trl"], default="aligntune")
     ap.add_argument("--hub-org", default=None, help="push checkpoints and the final adapter here")
+    ap.add_argument("--resume-from-hub", default=None, metavar="REPO_ID",
+                    help="restore the latest checkpoint from this Hub repo and resume (trl backend only)")
     a = ap.parse_args()
+    if a.resume_from_hub and a.backend == "aligntune":
+        raise SystemExit("AlignTune 0.1.33 cannot resume from a checkpoint (its train() takes no "
+                         "resume_from_checkpoint). Rerun with --backend trl --resume-from-hub ... to resume.")
 
     arms, lora = load_configs()
     base = arms["base_model"]
     name = adapter_name(a.arm, a.seed)
     out = Path("checkpoints") / name
     rows_path = Path("data/arms") / a.arm / "train.jsonl"
-    repo = f"{a.hub_org}/dhanground-{name}" if a.hub_org else None
+    repo = a.resume_from_hub or (f"{a.hub_org}/dhanground-{name}" if a.hub_org else None)
+    restored = restore_latest_checkpoint(a.resume_from_hub, out) if a.resume_from_hub else None
+    if a.resume_from_hub:
+        print(f"resuming from {restored}" if restored else f"no complete checkpoint in {a.resume_from_hub}; starting fresh")
+    elif a.backend == "aligntune" and repo:
+        print("note: AlignTune runs cannot resume; use --backend trl if this GPU session may die")
 
-    with CheckpointSync(out, repo):
+    with CheckpointSync(out, repo, already_sent=restored):
         if a.backend == "aligntune":
             from transformers import AutoTokenizer
 

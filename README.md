@@ -69,6 +69,10 @@ python -m adapters.aligntune_dpo --a2 checkpoints/A2-s0-<sha> --hub-org <org>
 
 If AlignTune fails on the chat template, add `--backend trl` (same LoRA settings, completion-only loss).
 
+If HF credits run out mid-run, resume on Kaggle from the last Hub checkpoint (saved every 200 steps):
+rerun the same command with `--backend trl --resume-from-hub <org>/dhanground-<arm>-s<seed>-<sha>`
+(DPO: just add `--resume-from-hub`). AlignTune 0.1.33 cannot resume, so use `--backend trl` for long SFT runs.
+
 **Set τ, evaluate, report.** Put adapter paths in `configs/serving.yaml`. Tune `tau` in
 `configs/retrieval.yaml` on dev so over-refusal stays under 10%. Score each arm on test once.
 

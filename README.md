@@ -27,6 +27,7 @@ Research demo, not financial or legal advice. Tiny Aya weights are non-commercia
 | `retrieval/` | 7 hybrid BM25 + multilingual embedding retriever |
 | `serving/`, `apps/api/` | 8 answer service, `/v1` FE↔BE contract |
 | `apps/space/` | 9 Gradio demo (mounted on the API server) |
+| `notebooks/` | `01_ingest` … `07_roi`: one notebook per stage, same calls as the Runbook below |
 
 ## Runbook
 

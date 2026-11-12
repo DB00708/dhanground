@@ -58,6 +58,7 @@ python -m pipeline.curate
 python -m pipeline.build_arms arms
 python -m pipeline.build_arms review          # fill keep=y/n in data/test/review.csv
 python -m pipeline.build_arms freeze --index index/rbi-2026-11-10
+python -m evals.make_test_card                  # evals/test_set_card.md
 ```
 
 **Train A1, A2 (3 seeds each), mine pairs, train A3.**
@@ -84,6 +85,18 @@ python -m evals.roi --measure --arm A3 --p-in <vendor $/1M in> --p-out <vendor $
 **Demo.** `python -m apps.api.build_cache --index index/rbi-2026-11-10` caches the 30 examples for all
 arms, then `python -m apps.space.app` serves the API and UI on port 7860. On an HF Space set
 `app_file: apps/space/app.py`. With `DEMO_MODE=cached` or no GPU, it serves labeled cached answers.
+
+**Publish.** Dry run first: it prints repo ids, files, row counts and sizes, and refuses if an input is missing
+or `data/test/test.jsonl` does not match `test.sha256`. Then push (private), check the repos, and make them public.
+
+```bash
+python scripts/publish_hf.py --org <org>
+python scripts/publish_hf.py --org <org> --push --public
+```
+
+This creates the datasets `dhanground-rbi-corpus`, `dhanground-hinglish-qa` (curated splits, gate log, frozen
+test set, results) and `dhanground-dpo-pairs`, each with a dataset card, and a "DhanGround" collection that also
+holds every `<org>/dhanground-*` adapter repo. Report toolkit bugs in `docs/upstream_issues.md`.
 
 ## Contracts
 

@@ -61,7 +61,7 @@ def build_card(test: Path, review: Path, corpus: Path) -> str:
             f"A person read {reviewed} of {sum(keep.values())} candidate rows in `data/test/review.csv`.",
             f"They kept {keep.get('y', 0)} rows (keep=y) and removed {keep.get('n', 0)} rows (keep=n).",
             f"{sum(keep.values()) - reviewed} rows have no valid keep value.",
-            "Only keep=y rows can go into the test set.",
+            "Only keep=y rows go into the test set, unless freeze ran with --allow-unreviewed.",
         ]
     else:
         review_text = ["No review file was found. The rows were not hand-checked."]

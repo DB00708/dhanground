@@ -199,7 +199,7 @@ def plan_jobs(paragraphs: dict[str, list[dict]], cfg: dict) -> list[Job]:
             kind = "unanswerable" if rng.random() < cfg["unanswerable_rate"] else "answerable"
             nxt = next_pid(p)
             pair = nxt if kind == "answerable" and nxt in in_split and multi_rng.random() < multi_rate else ""
-            slot = (p["pid"], lang, kind, pair)
+            slot = (p["pid"], lang, kind)   # k counts without the pair, so single jobs keep their base-plan keys
             uses[slot] = uses.get(slot, 0) + 1
             jobs.append(Job(split, p["pid"], p["doc_id"], p["para_id"], lang, kind, uses[slot], pair))
     return jobs

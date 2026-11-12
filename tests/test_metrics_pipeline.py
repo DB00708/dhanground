@@ -152,6 +152,7 @@ def test_plan_jobs_multi_passage_share_and_pairs():
     # switching the variant on does not move the base plan
     base = plan_jobs(paras, {**CFG, "multi_passage_rate": 0.0})
     assert [(j.pid, j.lang, j.kind) for j in a] == [(j.pid, j.lang, j.kind) for j in base]
+    assert {j.key for j in a if not j.pair_pid} <= {j.key for j in base}   # single jobs keep their keys
     j = multi[0]
     assert j.key != Job(j.split, j.pid, j.doc_id, j.para_id, j.lang, j.kind, j.k).key
 

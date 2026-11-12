@@ -121,7 +121,10 @@ def test_second_429_fails():
     clock = Clock()
     handler, state = server(clock, ask_hook=lambda req, body, n: rate_limited() if n <= 2 else None)
     code, out = run(handler, clock)
-    assert code == 1 and "A0/happy: status error (RATE_LIMITED)" in out and clock.sleeps.count(7.0) == 1
+    assert code == 1 and "A0/happy: status error (RATE_LIMITED)" in out
+    # one retry only (2 sends for A0, then 11 more arms/tags); the retry waited retry_after_s
+    assert len(state["asks"]) == 13 and state["asks"][1][0] - state["asks"][0][0] == 7.0
+    assert state["asks"][2][2]["request_id"] != state["asks"][1][2]["request_id"]
 
 
 def test_examples_missing_tag_fails():
@@ -150,3 +153,43 @@ def test_transport_timeout_is_status_timeout():
     handler, _ = server(clock, ask_hook=hook)
     code, out = run(handler, clock)
     assert code == 1 and "A1/happy: status timeout (client timeout)" in out
+
+
+def test_examples_non_json_or_missing_list_fails():
+    for resp in (httpx.Response(200, text="<html>loading</html>"), httpx.Response(200, json={"items": []})):
+        clock = Clock()
+        handler, state = server(clock, examples=resp)
+        code, out = run(handler, clock)
+        assert code == 1 and "FAIL: /v1/examples HTTP 200" in out and not state["asks"]
+
+
+def test_429_retry_is_recorded_in_pacer():
+    sent = []
+    clock = Clock()
+    pacer = warmup.Pacer(clock.sleep, clock)
+    real_wait = pacer.wait
+    pacer.wait = lambda: sent.append(clock()) or real_wait()
+    calls = []
+
+    def handler(req):
+        calls.append(req)
+        return rate_limited() if len(calls) == 1 else httpx.Response(200, json={"status": "ok", "source": "live"})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler), base_url="http://space")
+    r = warmup.ask(client, "s", "q?", "A0", clock.sleep, clock, pacer)
+    assert r["status"] == "ok" and len(calls) == 2 and len(pacer.sent) == 1 and sent == [7.0]
+
+
+def test_last_health_get_timeout_capped_at_remaining_wait():
+    clock = Clock()
+    timeouts = []
+
+    def handler(req):
+        timeouts.append(req.extensions["timeout"]["read"])
+        clock.t += 50  # each GET burns 50 s
+        raise httpx.ConnectError("refused", request=req)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler), base_url="http://space", timeout=60.0)
+    code = warmup.run("http://space", client=client, sleep=clock.sleep, clock=clock, out=lambda _: None, max_wait=120)
+    assert code == warmup.EXIT_NOT_READY
+    assert timeouts[0] == 60.0 and all(t <= 60.0 for t in timeouts) and min(timeouts) < 60.0

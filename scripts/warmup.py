@@ -125,14 +125,17 @@ def _run(client, per_tag, sleep, clock, out, max_wait) -> int:
 
     try:
         r = client.get("/v1/examples")
-        body = r.json() if r.status_code == 200 else None
-    except (httpx.HTTPError, ValueError) as e:
-        out(f"FAIL: could not read /v1/examples ({type(e).__name__})")
+    except httpx.HTTPError as e:
+        out(f"FAIL: could not reach /v1/examples ({type(e).__name__})")
         return EXIT_FAILED
-    if not isinstance(body, dict) or not isinstance(body.get("examples", []), list):
+    try:
+        body = r.json() if r.status_code == 200 else None
+    except ValueError:
+        body = None
+    if not isinstance(body, dict) or not isinstance(body.get("examples"), list):
         out(f"FAIL: /v1/examples HTTP {r.status_code}" + ("" if r.status_code != 200 else " (unexpected body)"))
         return EXIT_FAILED
-    examples = [e for e in body.get("examples", []) if isinstance(e, dict)]
+    examples = [e for e in body["examples"] if isinstance(e, dict)]
     questions = pick_questions(examples, per_tag)
     missing = [t for t in TAGS if not any(q["tag"] == t for q in questions)]
     if missing:

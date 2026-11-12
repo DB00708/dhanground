@@ -92,7 +92,7 @@ class AnswerEngine:
     def _answer(self, question: str, q_lang: str, arm: str, request_id: str, passages: list[dict] | None,
                 show_passages: bool) -> EngineResult:
         start = time.monotonic()
-        reply_lang = q_lang if q_lang in ABSTAIN_MESSAGES else "en"
+        reply_lang = langmod.reply_lang(q_lang)
         base = {"request_id": request_id, "arm": arm, "source": "live",
                 "index_version": getattr(self.retriever, "index_version", None)}
         meta: dict[str, dict] = {}
@@ -128,7 +128,7 @@ class AnswerEngine:
             return EngineResult(self._abstained(base, reply_lang, "schema", start, passages, show_passages, {
                 "schema": "fail", "citations": "n/a", "claim_check": "n/a"}), raw_outputs)
 
-        v = validate(output, typed, question)
+        v = validate(output, typed, question, question_lang=q_lang)
         if q_lang == langmod.OTHER and v.status == "ok" and not langmod.answer_lang_ok(v.answer, langmod.EN):
             return EngineResult(self._abstained(base, "en", "language", start, passages, show_passages, {
                 k: v.checks.get(k, "n/a") for k in ("schema", "citations", "claim_check")}), raw_outputs)

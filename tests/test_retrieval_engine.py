@@ -119,3 +119,12 @@ def test_other_language_note_on_gate_and_timeout(index_dir):
     assert gated["abstain_reason"] == "retrieval" and "Hinglish" in gated["note"]
     assert gated["answer"] == ABSTAIN_MESSAGES["en"]
     assert timed["status"] == "timeout" and "Hinglish" in timed["note"]
+
+
+def test_question_language_detected_once_per_request(monkeypatch):
+    from core import lang as langmod
+    calls = []
+    real = langmod.detect
+    monkeypatch.setattr(langmod, "detect", lambda text: calls.append(text) or real(text))
+    _tamil_answer("Auto reversal happens latest on T + 1 day [rbi-11693-p15]")
+    assert calls.count(TAMIL_Q) == 1

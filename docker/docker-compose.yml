@@ -1,0 +1,20 @@
+# Integration harness. From the repo root:
+#   docker compose -f docker/docker-compose.yml run --rm --build e2e
+# DHANGROUND_DATA points at the checkout holding the git-ignored corpus/, index/ and sources/pdf/
+# (default: the main checkout). They are mounted read-only; outputs go to the e2e-work volume.
+name: dhanground-e2e
+
+services:
+  e2e:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: dhanground-e2e:latest
+    volumes:
+      - ${DHANGROUND_DATA:-C:/Users/divya/pycharm_projects/dhanground}/corpus:/data/corpus:ro
+      - ${DHANGROUND_DATA:-C:/Users/divya/pycharm_projects/dhanground}/sources/pdf:/data/sources/pdf:ro
+      - ${DHANGROUND_DATA:-C:/Users/divya/pycharm_projects/dhanground}/index:/data/index:ro
+      - e2e-work:/work
+
+volumes:
+  e2e-work:

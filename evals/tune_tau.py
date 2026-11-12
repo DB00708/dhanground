@@ -22,14 +22,18 @@ import yaml
 RESULTS = Path("evals/results")
 CONFIG = Path("configs/retrieval.yaml")
 CURVE_QUANTILES = (0.0, 0.01, 0.02, 0.05, 0.10, 0.20)
-_TAU_LINE = re.compile(r"^(tau:[ \t]*)(\S+)(.*)$", re.MULTILINE)
+_TAU_LINE = re.compile(r"^(tau:[ \t]*)([^\s#]*)(.*)$", re.MULTILINE)  # value may be empty
+# The question at the cut sits exactly on tau; a float drift (e.g. CPU vs GPU cosine) would gate it.
+# Lower tau by a tiny margin so it stays ungated; this never gates more questions on dev.
+_EDGE = 1e-6
 
 
 def _tau_at(answerable_sorted: list[float], max_gated: float) -> float:
     # A question is gated when score < tau. With tau = the (m+1)-th smallest score, at most m fall
     # below it (fewer with ties); any higher tau would gate m+1.
     m = math.floor(max_gated * len(answerable_sorted) + 1e-9)
-    return answerable_sorted[min(m, len(answerable_sorted) - 1)]
+    cut = answerable_sorted[min(m, len(answerable_sorted) - 1)]
+    return cut - _EDGE * max(1.0, abs(cut))
 
 
 def _share_below(scores: list[float], tau: float) -> float | None:
@@ -37,7 +41,7 @@ def _share_below(scores: list[float], tau: float) -> float | None:
 
 
 def choose_tau(answerable: list[float], unanswerable: list[float], max_gated: float = 0.05) -> dict:
-    """Highest tau gating at most max_gated of answerable scores, plus a small curve for the report."""
+    """Highest tau (less a 1e-6 edge margin) gating at most max_gated of answerable scores, plus a small curve for the report."""
     if not answerable:
         raise ValueError("need at least one answerable dev question to set tau")
     if not 0.0 <= max_gated < 1.0:
@@ -70,7 +74,8 @@ def replace_tau(config_text: str, tau: float) -> str:
         comment = rest.lstrip(" \t")
         if comment.strip():  # keep the comment in its column when the new value fits
             rest = " " * max(1, len(old) + len(rest) - len(comment) - len(new)) + comment
-        return m.group(1) + new + rest
+        head = m.group(1) if m.group(1) != "tau:" else "tau: "  # a bare `tau:` needs a space
+        return head + new + rest
 
     new_text, n = _TAU_LINE.subn(sub, config_text, count=1)
     if n != 1:

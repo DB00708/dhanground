@@ -5,6 +5,11 @@ import yaml
 
 from evals.tune_tau import choose_tau, main, replace_tau
 
+
+def near(x):
+    return pytest.approx(x, abs=1e-5)  # tau sits 1e-6 below the cut score
+
+
 CONFIG = """k: 4
 hybrid:
   bm25_weight: 0.5
@@ -18,27 +23,27 @@ index_version: null       # e.g. rbi-2026-11-09, stamped on every answer
 def test_tau_gates_at_most_max_share_of_answerable():
     ans = [i / 100 for i in range(1, 101)]  # 0.01 .. 1.00
     res = choose_tau(ans, [0.0, 0.02, 0.5, 0.9], max_gated=0.05)
-    assert res["tau"] == pytest.approx(0.06)  # 5 scores (0.01..0.05) below it; any higher gates 6
-    assert res["answerable_gated"] == pytest.approx(0.05)
-    assert res["unanswerable_caught"] == pytest.approx(0.5)
+    assert res["tau"] == near(0.06)  # 5 scores (0.01..0.05) below it; any higher gates 6
+    assert res["answerable_gated"] == near(0.05)
+    assert res["unanswerable_caught"] == near(0.5)
     assert [c["quantile"] for c in res["curve"]][0] == 0.0
     assert all(c["answerable_gated"] <= c["quantile"] + 1e-9 for c in res["curve"])
 
 
 def test_all_answerable_high_catches_low_unanswerable():
     res = choose_tau([0.9, 0.91, 0.95], [0.1, 0.2], max_gated=0.05)
-    assert res["tau"] == 0.9 and res["answerable_gated"] == 0.0 and res["unanswerable_caught"] == 1.0
+    assert res["tau"] == near(0.9) and res["answerable_gated"] == 0.0 and res["unanswerable_caught"] == 1.0
 
 
 def test_ties_never_exceed_budget():
     res = choose_tau([0.3] + [0.5] * 9, [0.4], max_gated=0.2)  # 2 allowed, but 0.5 ties
-    assert res["tau"] == 0.5 and res["answerable_gated"] == pytest.approx(0.1)
+    assert res["tau"] == near(0.5) and res["answerable_gated"] == near(0.1)
     assert res["unanswerable_caught"] == 1.0
 
 
 def test_empty_unanswerable_and_empty_answerable():
     res = choose_tau([0.2, 0.4], [], max_gated=0.05)
-    assert res["tau"] == 0.2 and res["unanswerable_caught"] is None
+    assert res["tau"] == near(0.2) and res["unanswerable_caught"] is None
     with pytest.raises(ValueError):
         choose_tau([], [0.1])
 
@@ -85,17 +90,17 @@ def test_cli_end_to_end(index_dir, tmp_path, capsys):
 def test_twenty_answerable_at_five_percent_gates_at_most_one():
     ans = [0.30, 0.31] + [0.4 + i / 100 for i in range(18)]
     res = choose_tau(ans, [], max_gated=0.05)
-    assert sum(s < res["tau"] for s in ans) <= 1 and res["tau"] == 0.31
+    assert sum(s < res["tau"] for s in ans) <= 1 and res["tau"] == near(0.31)
     tied = [0.30, 0.30, 0.30] + [0.5] * 17  # tie at the cut: gate none rather than three
     res = choose_tau(tied, [], max_gated=0.05)
-    assert sum(s < res["tau"] for s in tied) == 0 and res["tau"] == 0.30
+    assert sum(s < res["tau"] for s in tied) == 0 and res["tau"] == near(0.30)
 
 
 @pytest.mark.parametrize("n", [1, 2, 5, 19])
 def test_tiny_dev_sets_gate_nothing_at_five_percent(n):
     ans = [0.1 * (i + 1) for i in range(n)]
     res = choose_tau(ans, [0.0], max_gated=0.05)
-    assert res["tau"] == min(ans) and res["answerable_gated"] == 0.0
+    assert res["tau"] == near(min(ans)) and res["answerable_gated"] == 0.0
 
 
 def test_bm25_zero_scores_give_a_tau_that_gates_nothing():
@@ -103,9 +108,9 @@ def test_bm25_zero_scores_give_a_tau_that_gates_nothing():
     # English index). If such answerable questions exceed the budget, tau must not gate them.
     ans = [0.0] * 3 + [2.5] * 17
     res = choose_tau(ans, [0.0, 0.0], max_gated=0.05)
-    assert res["tau"] == 0.0 and res["answerable_gated"] == 0.0 and res["unanswerable_caught"] == 0.0
+    assert res["tau"] == near(0.0) and res["answerable_gated"] == 0.0 and res["unanswerable_caught"] == 0.0
     res = choose_tau([0.0] + [2.5] * 19, [0.0, 1.0], max_gated=0.05)  # one zero fits the budget
-    assert res["tau"] == 2.5 and res["answerable_gated"] == pytest.approx(0.05)
+    assert res["tau"] == near(2.5) and res["answerable_gated"] == near(0.05)
     assert res["unanswerable_caught"] == 1.0
 
 
@@ -169,3 +174,18 @@ def test_live_scores_match_serving_retriever(index_dir, monkeypatch):
     engine.tau = choose_tau(ans, [], max_gated=0.25)["tau"]
     gated = [engine.answer(r["question"], "A0").response.get("abstain_reason") == "retrieval" for r in rows]
     assert sum(gated) <= 1
+
+
+def test_max_gated_zero_gates_nothing_and_cut_question_keeps_a_margin():
+    ans = [0.42, 0.5, 0.61]
+    res = choose_tau(ans, [], max_gated=0.0)
+    assert res["answerable_gated"] == 0.0 and res["tau"] == near(0.42)
+    assert 0.42 - 2e-6 < res["tau"] < 0.42 - 1e-7  # a drift of 1e-7 on 0.42 still passes the gate
+
+
+@pytest.mark.parametrize("line", ["tau:", "tau:   ", "tau:                 # set on dev"])
+def test_replace_tau_accepts_an_empty_value(line):
+    out = replace_tau(f"k: 4\n{line}\nindex_version: null\n", 0.25)
+    assert yaml.safe_load(out)["tau"] == 0.25 and out.startswith("k: 4\n") and out.endswith("index_version: null\n")
+    if "#" in line:
+        assert "# set on dev" in out

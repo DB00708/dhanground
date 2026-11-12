@@ -128,3 +128,8 @@ def test_question_language_detected_once_per_request(monkeypatch):
     monkeypatch.setattr(langmod, "detect", lambda text: calls.append(text) or real(text))
     _tamil_answer("Auto reversal happens latest on T + 1 day [rbi-11693-p15]")
     assert calls.count(TAMIL_Q) == 1
+
+
+def test_other_language_answer_with_citation_and_acronyms_abstains():
+    r = _tamil_answer("T + 1 நாள் [rbi-11693-p15]")
+    assert r["status"] == "abstained" and r["abstain_reason"] == "language" and "Hinglish" in r["note"]

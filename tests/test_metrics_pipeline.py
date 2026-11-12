@@ -112,3 +112,12 @@ def test_verdict_other_language_expects_english():
     tamil = verdict(row, {"status": "ok", "answer": "T + 1 நாளில் பணம் திரும்ப வரும்"}, {})
     numeric = verdict(row, {"status": "ok", "answer": "10,000"}, {})
     assert english["lang_ok"] is True and tamil["lang_ok"] is False and numeric["lang_ok"] is True
+
+
+def test_verdict_citation_markers_do_not_flip_language():
+    row = {"row_id": "hd-0", "lang": "hi-Deva", "question": "यूपीआई रिफंड कब आएगा?", "answerable": True}
+    assert verdict(row, {"status": "ok", "answer": "T + 1 दिन [rbi-11693-p15]"}, {})["lang_ok"] is True
+    ta = {"row_id": "ta-1", "lang": "other", "question": "UPI பணம் எப்போது திரும்ப வரும்?", "answerable": True}
+    assert verdict(ta, {"status": "ok", "answer": "T + 1 நாள் [rbi-11693-p15]"}, {})["lang_ok"] is False
+    assert verdict(ta, {"status": "ok", "answer": "₹10,000 [rbi-1-p2]"}, {})["lang_ok"] is True
+    assert verdict(ta, {"status": "ok", "answer": "Latest by T + 1 day [rbi-11693-p15]"}, {})["lang_ok"] is True

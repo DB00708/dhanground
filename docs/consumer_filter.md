@@ -42,22 +42,22 @@ From `intelligence.generate.load_paragraphs` (after the contents-page and minimu
 
 | Split | Before | After | Dropped |
 |---|---:|---:|---:|
-| train | 1815 | 1511 | 304 |
+| train | 1815 | 1533 | 282 |
 | dev | 224 | 140 | 84 |
 | test | 463 | 418 | 45 |
-| **total** | **2502** | **2069** | **433** |
+| **total** | **2502** | **2091** | **411** |
 
 | Document | Split | Before | After |
 |---|---|---:|---:|
-| md-13141 KYC | train | 395 | 183 |
-| md-13140 Responsible Business Conduct | train | 612 | 568 |
+| md-13141 KYC | train | 395 | 193 |
+| md-13140 Responsible Business Conduct | train | 612 | 577 |
 | md-12156 PPIs | dev | 207 | 123 |
 | md-13155 Credit / Debit Cards | train | 135 | 130 |
 | md-13642 Digital Payment Security | test | 104 | 59 |
 | md-13157 Interest on Deposits | train | 84 | 79 |
 | md-13271 Internal Ombudsman | train | 54 | 29 |
-| ios-2026 Integrated Ombudsman Scheme | train | 81 | 77 |
-| md-12616 BBPS | train | 21 | 12 |
+| ios-2026 Integrated Ombudsman Scheme | train | 81 | 79 |
+| md-12616 BBPS | train | 21 | 13 |
 | md-13156 Credit Facilities (unchanged) | train | 198 | 198 |
 
 All other documents are unchanged.
@@ -74,7 +74,7 @@ needs 200 jobs at 2 questions per call, so each of the 140 passages is used abou
 | I | Preliminary (definitions: OVD, CDD, V-CIP, etc.) | 46 (p7-52) | keep | customers ask what counts as an OVD, what V-CIP is |
 | II | General (KYC policy, board, ML/TF risk assessment) | 14 (p53-66) | exclude | board and policy framework |
 | III | Customer Acceptance Policy | 7 (p67-73) | keep | when a bank may refuse or must not deny an account |
-| IV | Risk Management (risk categorisation, STR instead of CDD) | 3 (p74-76) | exclude | internal risk scoring; **borderline** |
+| IV | Risk Management (risk categorisation, STR instead of CDD) | 3 (p74-76) | keep | bank must not reveal the risk category to the customer (reviewer) |
 | V | Customer Identification Procedure | 4 (p77-80) | keep | when identification is needed, reliance on third-party CDD |
 | VI | Customer Due Diligence | 107 (p81-187) | keep 102 | documents, e-KYC, V-CIP, small accounts, re-KYC, PEPs, foreign students |
 | VI § 46 | Client accounts via professional intermediaries | 2 (p180-181) | exclude | intermediary-side obligations |
@@ -82,13 +82,14 @@ needs 200 jobs at 2 questions per call, so each of the 140 passages is used abou
 | VII | Record Management | 5 (p188-192) | exclude | record keeping |
 | VIII | Reporting to FIU-India | 6 (p193-198) | exclude | CTR / STR reporting |
 | IX | International agreements (UNSC / UAPA lists, FATF jurisdictions) | 16 (p199-214) | exclude | sanctions screening by the bank |
-| X | Other Instructions | 55 (p215-269) | keep 22 | see rows below |
+| X | Other Instructions | 55 (p215-269) | keep 30 | see rows below |
 | X § 62-63 | Secrecy obligations and sharing of customer information | 2 (p215-216) | keep | "can my bank share my data?" |
 | X § 64 | Foreign Contribution (FCRA) | 1 (p217) | exclude | NGO-specific; **borderline** |
 | X § 65 | CKYCR: KYC identifier, re-KYC via CKYCR | 10 (p218-227) | keep | customers get and use a KYC identifier |
 | X § 66 | FATCA / CRS reporting | 4 (p228-231) | exclude | reporting to tax authorities |
 | X § 67-70 | Cheque validity, money mules, account payee cheques, UCIC | 5 (p232-236) | keep | cheque validity period, account freeze for mule accounts |
-| X § 72-74 | New technologies, correspondent banking, wire transfers | 25 (p237-261) | exclude | bank-to-bank; **borderline** for wire-transfer originator data |
+| X § 72-73, 74(2)+ | New technologies, correspondent banking, wire-transfer bank duties | 17 (p237-242, p251-261) | exclude | bank-to-bank |
+| X § 74(1) | Wire-transfer information: originator details for ₹50,000+ | 8 (p243-250) | keep | counter rule like the DD rule (reviewer) |
 | X § 75-77 | Demand drafts ≥ ₹50,000, quoting PAN, third-party products | 5 (p262-266) | keep | DD and PAN rules customers meet at the counter |
 | X § 78-79 | At-par cheques for co-op banks, hiring / training staff | 3 (p267-269) | exclude | internal |
 | XI | Repeal and Other Provisions + annexes (UAPA and WMD Act orders) | 135 (p270-404) | exclude | repeal list and government orders to banks / registrars |
@@ -108,11 +109,11 @@ needs 200 jobs at 2 questions per call, so each of the 140 passages is used abou
 | V | Financial Inclusion and Accessibility | 44 (p128-171) | keep | BSBD accounts, senior citizens, Form 15G / H |
 | VI | Payment and Remittance Services | 26 (p172-197) | keep | demand drafts, remittances |
 | VII | Deposit Accounts and Other Liabilities | 194 (p198-391) | keep | passbooks, inoperative accounts, lockers, deceased claims |
-| VIII A-I | Responsible Lending (fair practices, KFS, collateral release, microfinance) | 113 (p392-504) | keep | loan charges, timelines, compensation for late document release |
-| VIII J | Export Credit | 26 (p505-530) | exclude | exporters, not retail |
-| VIII K | Recovery agents | 12 (p531-542) | keep | what recovery agents may not do, complaints |
+| VIII A-I | Responsible Lending (fair practices, KFS, collateral release, microfinance) | 113 (p392-504) + p505 | keep | loan charges, timelines, compensation for late document release |
+| VIII J | Export Credit | 18 (p506-523) | exclude | exporters, not retail (p505 kept: it ends the microfinance section) |
+| VIII K | Recovery agents | 19 (p524-542) | keep | what recovery agents may not do, complaints |
 | IX | Miscellaneous (standing instructions) | 8 (p543-550) | keep | customer instructions |
-| X | Repeal and Savings | 5 (p551-555) | exclude | repeal list |
+| X | Repeal and Savings | 4 (p552-555) | exclude | repeal list (p551 kept: §463 no incentives on banking products) |
 | X annexes | Notice board, rates at a glance, deceased-claim forms, indemnity, locker inventory, KFS | 64 (p556-619) | keep | which documents a claim needs; **borderline** (many are blank form fields) |
 
 ## md-12156 Prepaid Payment Instruments (212 passages, dev; no chapter headings)
@@ -187,7 +188,8 @@ needs 200 jobs at 2 questions per call, so each of the 140 passages is used abou
 | 1-6 | Scope, definitions, ombudsman offices, CRPC | 16 (p1-16) | keep | who is covered, where complaints go |
 | 7 | Staffing of ombudsman offices | 1 (p17) | exclude | RBI internal |
 | 8-18 | Powers, grounds, filing, resolution, award, appeal, display duties | 46 (p18-63) | keep | the customer complaint process |
-| 19-20 | Removal of difficulties, repeal of the 2021 scheme | 3 (p64-66) | exclude | repeal; **borderline** (p66 says when 2021-scheme complaints still apply) |
+| 19 | Removal of difficulties | 1 (p64) | exclude | RBI power |
+| 20 | Repeal of the 2021 scheme, pending complaints | 2 (p65-66) | keep | which scheme covers complaints before July 1, 2026 (reviewer) |
 | Annexes | Guidance for filing, complaint form | 17 (p67-83) | keep | how to file, compensation caps |
 
 ## md-12616 Bharat Bill Payment System (21 passages, train; no chapter headings)
@@ -198,18 +200,18 @@ needs 200 jobs at 2 questions per call, so each of the 140 passages is used abou
 | 1 | Short title | 1 (p5) | keep | untagged |
 | 2-3 | Applicability, authorisation of NBBL / BBPOUs | 2 (p6-7) | exclude | operator licensing |
 | 4 | Definitions | 5 (p8-12) | keep | what BBPS, biller, COU are |
-| 5-7 | Participation, roles, settlement and escrow | 6 (p13-18) | exclude | operator / participant obligations |
+| 5-7 | Participation, roles, settlement and escrow | 5 (p13-15, p17-18) | exclude | operator / participant obligations |
+| 6 c | COU duties: customer access to billers, dispute system | 1 (p16) | keep | customer-facing |
 | 8 | Complaint management, failed transactions | 2 (p19-20) | keep | customer complaint and refund timelines |
 | 9 | Supersession | 1 (p21) | exclude | repeal list |
 
 ## Borderline calls (for confirmation)
 
-1. md-13141 IV Risk Management (3 passages): excluded. Customers rarely ask how their risk category is set.
-2. md-13141 X § 72-74 wire transfers (25 passages): excluded as bank-to-bank; a customer might ask what details a
-   transfer must carry.
+1. md-13141 IV Risk Management (3 passages): now kept (T4 reviewer).
+2. md-13141 X § 74(1) wire-transfer information (8 passages): now kept; the rest of § 72-74 (17) stays excluded.
 3. md-13141 X § 64 FCRA (1 passage): excluded; matters only to NGOs.
 4. md-13140 X annexes (64 passages): kept. They include blank claim and indemnity forms that may give weak questions,
    but also the list of documents for a deceased-depositor claim.
 5. md-13155 V Co-branding (8 passages): kept; mostly bank-partner arrangements, with some data-sharing rules.
-6. ios-2026 § 20 (p64-66): excluded as repeal, but it says which scheme applies to older complaints.
+6. ios-2026 § 20 (p65-66): now kept (T4 reviewer); only § 19 (p64) excluded.
 7. Dev split shrinks from 224 to 140 source passages (PPI only); see note above.

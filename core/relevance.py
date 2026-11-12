@@ -67,6 +67,8 @@ def span_pids(passages: list[dict], start: str, end: str | None) -> set[str]:
     """pids from the passage containing `start` up to (not including) the one containing `end`, case-insensitive.
 
     `end` None runs to the end of the document. Skips contents pages, which also contain the heading text.
+    Returns an empty set if `start` is not found; raises ValueError if `end` is given but never found after it,
+    so a typo in `end` cannot silently swallow the rest of the document.
     """
     inside, out = False, set()
     for p in sorted(passages, key=lambda p: int(p["para_id"].lstrip("p"))):
@@ -74,11 +76,13 @@ def span_pids(passages: list[dict], start: str, end: str | None) -> set[str]:
         if _TOC_RE.search(p["text"]):
             continue
         if inside and end is not None and end.lower() in low:
-            break
+            return out
         if start.lower() in low:
             inside = True
         if inside:
             out.add(p["pid"])
+    if inside and end is not None:
+        raise ValueError(f"span end not found after {start!r}: {end!r}")
     return out
 
 

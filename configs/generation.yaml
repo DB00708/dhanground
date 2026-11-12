@@ -18,8 +18,8 @@ exclude_chapters:
   md-13156:   # Credit Facilities: keep I definitions, III digital lending, IV gold/silver loans,
               # VI microfinance, XIII loans against financial assets, XVII miscellaneous
     [II, IIA, VA, VII, VIII, IX, X, XI, XII, XIIIA, XIV, XV, XVI, XVIII]
-  md-13141:   # KYC: keep I definitions, III acceptance policy, V identification, VI due diligence; X via keep_spans
-    [II, IV, VII, VIII, IX, X, XI]   # board/policy, risk categorisation, records, FIU reporting, sanctions lists, repeal + UAPA orders
+  md-13141:   # KYC: keep I definitions, III acceptance policy, IV risk category (not revealed to customer), V, VI; X via keep_spans
+    [II, VII, VIII, IX, X, XI]   # board/policy, records, FIU reporting, sanctions lists, repeal + UAPA orders
   md-13155: [VIII]          # Cards: repeal (keep_spans keeps the KFS table that shares its first passage)
   md-13157: [VII]           # Interest on Deposits: repeal
   md-13642: [II, III, VII]  # Digital Payment Security: board, bank IT controls (keep_spans: authentication, fraud, customer protection), repeal
@@ -30,6 +30,7 @@ keep_spans:   # sections inside an excluded chapter that customers do ask about 
     - {from: "Chapter X – Other Instructions", to: "64. Compliance with the provisions of Foreign Contribution"}  # secrecy of customer data
     - {from: "65. CDD Procedure and sharing KYC information", to: "Under FATCA and CRS"}   # CKYC identifier, re-KYC via CKYCR
     - {from: "67. Period for presenting payment instruments", to: "72. Introduction of New Technologies"}   # cheque validity, money mules, UCIC
+    - {from: "74. Wire Transfer", to: "(2) Responsibilities of ordering bank"}   # originator details on transfers of ₹50,000+
     - {from: "75. Issue and Payment of Demand Drafts", to: "78. At-par cheque facility"}   # DD over ₹50,000, quoting PAN, third-party products
   md-13155:
     - {from: "At application - Key fact statement", to: "Repeal and saving 93"}
@@ -43,8 +44,8 @@ exclude_spans:   # sections inside a kept chapter, or in documents without chapt
   md-13140:   # Responsible Business Conduct: chapters I, III-IX are customer-facing
     - {from: "Chapter II – Institutional Framework", to: "B.2.1 Deposit Policy"}   # board policy lists and reviews
     - {from: "B.4 Customer Service Committee of the Board", to: "Chapter III – Customer Service in Branches"}   # board / branch committees
-    - {from: "J. Export Credit", to: "K.1 Incentives to recovery agents"}   # exporters, not retail
-    - {from: "Repeal and Savings 464", to: "We have separately displayed the key interest rates"}   # repeal; annexes (notice board, claim forms, KFS) kept
+    - {from: "J.1.2 Working Group to review export credit", to: "K. Recovery Agents engaged by Banks"}   # exporters, not retail
+    - {from: "With the issue of these Directions, the existing Directions", to: "We have separately displayed the key interest rates"}   # repeal; annexes (notice board, claim forms, KFS) kept
   md-12156:   # PPIs (no chapter headings)
     - {from: "3. Eligibility requirements for issuance of PPIs by banks", to: "6. Safeguards against money laundering"}   # issuer eligibility, capital, authorisation
     - {from: "12. Deployment of money collected", to: "13. Validity and redemption"}   # escrow investment
@@ -55,10 +56,11 @@ exclude_spans:   # sections inside a kept chapter, or in documents without chapt
     - {from: "16. Reporting to Reserve Bank", to: null}   # reporting to RBI, repeal, quarterly report annexure
   ios-2026:
     - {from: "7. Staffing of the Offices of the RBI Ombudsman", to: "Powers and Functions (1)"}
-    - {from: "Removal of Difficulties in the Scheme", to: "Guidance for filing of a complaint"}   # repeal of the 2021 scheme
+    - {from: "Removal of Difficulties in the Scheme", to: "20. Repeal of the Existing Schemes"}   # s.20 kept: which scheme covers older complaints
   md-12616:   # BBPS: keep definitions and complaint handling; drop operator authorisation, participants, settlement
     - {from: "2. Applicability The provisions of these Directions", to: "4. Definitions In these Directions"}
-    - {from: "Banks (All Scheduled Commercial Banks", to: "8. Complaint Management and Grievance Redressal"}
+    - {from: "Banks (All Scheduled Commercial Banks", to: "Ensuring customers (including customers of their agent"}
+    - {from: "Non-bank BBPOU operates as Payment Aggregator", to: "8. Complaint Management and Grievance Redressal"}
     - {from: "9. Supersession of earlier BBPS related guidelines", to: null}
 exclude_terms: []   # case-insensitive substrings; a passage containing one is skipped
 concurrency: 8

@@ -103,3 +103,9 @@ def test_configured_spans_resolve_on_the_real_index():
             ps = [p for p in passages if p["doc_id"] == doc_id]
             for span in spans:
                 assert span_pids(ps, span["from"], span.get("to")), (kind, doc_id, span["from"])
+
+
+def test_span_end_typo_fails_instead_of_running_to_document_end():
+    with pytest.raises(ValueError):
+        consumer_passages(DOC, {"md-x": ["VIII"]}, [],
+                          {"md-x": [{"from": "B. Housing Finance", "to": "C. Loans TYPO"}]})

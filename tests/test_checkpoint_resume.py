@@ -83,3 +83,56 @@ def test_restore_skips_download_when_already_local(monkeypatch, tmp_path):
     (local / "trainer_state.json").write_text("{}")
     assert restore_latest_checkpoint(REPO, tmp_path) == local
     assert all(c[0] != "download" for c in calls)
+
+
+# --- local resume picker, Hub-aware sync, run naming (edge case 19) ---
+
+import pytest
+
+from adapters.common import CheckpointSync, name_from_repo, resume_checkpoint
+
+
+def _ckpt(root, step, complete=True):
+    d = root / f"checkpoint-{step}"
+    d.mkdir(parents=True)
+    if complete:
+        (d / "trainer_state.json").write_text("{}")
+    return d
+
+
+def test_resume_checkpoint_skips_higher_numbered_partial(tmp_path):
+    _ckpt(tmp_path, 200)
+    want = _ckpt(tmp_path, 1000)
+    _ckpt(tmp_path, 1200, complete=False)  # crash mid-save; transformers' get_last_checkpoint would pick this
+    assert resume_checkpoint(tmp_path) == want
+
+
+def test_resume_checkpoint_none_when_nothing_complete(tmp_path):
+    _ckpt(tmp_path, 400, complete=False)
+    assert resume_checkpoint(tmp_path) is None
+    assert resume_checkpoint(tmp_path / "missing") is None
+
+
+def test_sync_never_reuploads_checkpoints_already_on_hub(monkeypatch, tmp_path):
+    uploads = []
+    hub_files = ["checkpoints/checkpoint-800/trainer_state.json", "checkpoints/checkpoint-1000/trainer_state.json"]
+    mod = types.SimpleNamespace(
+        create_repo=lambda *a, **k: None,
+        list_repo_files=lambda repo_id: hub_files,
+        upload_folder=lambda repo_id, folder_path, path_in_repo: uploads.append(path_in_repo),
+    )
+    monkeypatch.setitem(sys.modules, "huggingface_hub", mod)
+    _ckpt(tmp_path, 1000)  # restored from the Hub
+    sync = CheckpointSync(tmp_path, REPO, every_s=3600)
+    with sync:
+        _ckpt(tmp_path, 1200)  # written after resume
+        _ckpt(tmp_path, 1400, complete=False)  # still being saved
+    assert uploads == ["checkpoints/checkpoint-1200"]
+
+
+def test_name_from_repo_keeps_original_sha_and_checks_arm_seed():
+    assert name_from_repo("org/dhanground-A2-s1-abc1234", "A2", 1) == "A2-s1-abc1234"
+    with pytest.raises(SystemExit):
+        name_from_repo("org/dhanground-A2-s0-abc1234", "A2", 1)
+    with pytest.raises(SystemExit):
+        name_from_repo("org/dhanground-A1-s0-abc1234", "A2", 0)

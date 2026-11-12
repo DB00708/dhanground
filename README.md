@@ -22,7 +22,7 @@ Research demo, not financial or legal advice. Tiny Aya weights are non-commercia
 | `pipeline/curate.py` + `adapters/curatorkit_run.py` | 3 curation gates (ours + CuratorKIT dedup / grounding / reward) |
 | `pipeline/build_arms.py` | A1/A2 datasets, test review and freeze |
 | `intelligence/mine_pairs.py` | 4 DPO pairs from A2's own failures |
-| `adapters/aligntune_sft.py`, `adapters/aligntune_dpo.py` | 5 trainer (AlignTune SFT; TRL DPO with A2 as reference) |
+| `adapters/aligntune_sft.py`, `adapters/train_arm.py`, `adapters/aligntune_dpo.py` | 5 trainer (AlignTune SFT seed 0, TRL SFT other seeds; TRL DPO with A2 as reference) |
 | `evals/` + `adapters/auditkit_eval.py` | 6 evaluator, summary, ROI |
 | `retrieval/` | 7 hybrid BM25 + multilingual embedding retriever |
 | `serving/`, `apps/api/` | 8 answer service, `/v1` FE↔BE contract |
@@ -62,16 +62,30 @@ python -m pipeline.build_arms freeze --index index/rbi-2026-11-10
 **Train A1, A2 (3 seeds each), mine pairs, train A3.**
 
 ```bash
-python -m adapters.aligntune_sft --arm A1 --seed 0 --hub-org <org>     # repeat seeds 1, 2; then A2
+python -m adapters.train_arm --arm A1 --hub-org <org>    # seed 0 via AlignTune, seeds 1, 2 via --backend trl
+python -m adapters.train_arm --arm A2 --hub-org <org>
 python -m intelligence.mine_pairs --a2 checkpoints/A2-s0-<sha> --extra-curated-train 1500
 python -m adapters.aligntune_dpo --a2 checkpoints/A2-s0-<sha> --hub-org <org>
 ```
 
-If AlignTune fails on the chat template, add `--backend trl` (same LoRA settings, completion-only loss).
+Seed split: AlignTune 0.1.33 cannot resume (its SFT `train()` calls the HF trainer with no
+`resume_from_checkpoint`), so it trains only seed 0 of A1 and A2, the run that carries the
+CuratorKIT → AlignTune → AuditKIT chain. Seeds 1 and 2 use `--backend trl`, which can resume.
+Both backends train on the same `messages` rows, the same chat-template render (with
+`enable_thinking=False`, which AlignTune adds), the same loss mask (`sft.assistant_only_loss`) and the
+same LoRA and optimizer settings (`configs/lora.yaml`). Before training, each run checks on the real
+tokenizer that the training render starts with the exact prompt serving builds; it stops if not.
+If it stops because TRL cannot mask assistant tokens for this template, set
+`sft.assistant_only_loss: false` (both backends then use full-sequence loss) and say so in the report.
+`--dry-run` prints the per-seed commands. If AlignTune fails outright, pass `--aligntune-seeds` with no
+value to train every seed with `--backend trl`.
 
 If HF credits run out mid-run, resume on Kaggle from the last Hub checkpoint (saved every 200 steps):
-rerun the same command with `--backend trl --resume-from-hub <org>/dhanground-<arm>-s<seed>-<sha>`
-(DPO: just add `--resume-from-hub`). AlignTune 0.1.33 cannot resume, so use `--backend trl` for long SFT runs.
+`python -m adapters.aligntune_sft --arm <arm> --seed <seed> --backend trl --resume-from-hub <org>/dhanground-<arm>-s<seed>-<sha>`
+(DPO: rerun the same command plus `--resume-from-hub <org>/dhanground-A3-s0-<sha>`). The resumed run keeps
+the original run's name and repo. A dead AlignTune seed 0 cannot resume: rerun it from step 0, or resume it
+with `--backend trl` and record in the report that seed 0 finished on TRL.
+Then rerun `train_arm` with `--seeds` set to the seeds still missing.
 
 **Set τ, evaluate, report.** Put adapter paths in `configs/serving.yaml`. Tune `tau` in
 `configs/retrieval.yaml` on dev so over-refusal stays under 10%. Score each arm on test once.

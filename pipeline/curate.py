@@ -32,7 +32,9 @@ def deterministic_gates(row: dict, corpus_sha: dict[str, str]) -> list[tuple[str
 
     srcs = row.get("source_pids") or [row.get("source_pid")]
     shas = row["provenance"].get("span_sha256s") or [row["provenance"]["span_sha256"]]
-    prov_ok = len(srcs) == len(shas) and all(corpus_sha.get(s) == h for s, h in zip(srcs, shas))
+    prov = row["provenance"]
+    prov_ok = (len(srcs) == len(shas) and all(corpus_sha.get(s) == h for s, h in zip(srcs, shas))
+               and srcs[0] == row.get("source_pid") and shas[0] == prov["span_sha256"])   # legacy fields = first source
     out.append(("provenance", "pass" if prov_ok else "fail", "" if prov_ok else "span hash mismatch"))
 
     q_lang = langmod.detect(row["question"])

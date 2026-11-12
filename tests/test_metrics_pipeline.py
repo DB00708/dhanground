@@ -210,3 +210,17 @@ def test_curation_gate_needs_every_source_cited_and_hashed():
     assert gates["citations"] == "fail" and gates["provenance"] == "pass"
     gates = dict((g, d) for g, d, _ in deterministic_gates(both, {**sha, "rbi-11693-p16": "zzz"}))
     assert gates["provenance"] == "fail"
+    # two sources but no per-source hashes; legacy fields disagreeing with the first source
+    no_shas = {**both, "provenance": {k: v for k, v in two["provenance"].items() if k != "span_sha256s"}}
+    bad_first_sha = {**both, "provenance": {**two["provenance"], "span_sha256": "zz"}}
+    bad_first_pid = {**both, "source_pid": "rbi-11693-p16"}
+    for row in (no_shas, bad_first_sha, bad_first_pid):
+        assert dict((g, d) for g, d, _ in deterministic_gates(row, sha))["provenance"] == "fail"
+
+
+def test_review_sheet_shows_every_source_passage():
+    from pipeline.build_arms import source_text
+    row = {"passages": [{"pid": "a-p1", "text": "first"}, {"pid": "x", "text": "noise"}, {"pid": "a-p2", "text": "second"}],
+           "source_pid": "a-p1", "source_pids": ["a-p1", "a-p2"]}
+    assert source_text(row) == "first\n---\nsecond"
+    assert source_text({**row, "source_pids": None}) == "first"

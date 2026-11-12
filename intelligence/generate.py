@@ -117,7 +117,7 @@ _SHORTHAND = {
     "wapas": "wpas", "wapis": "wpas", "aayega": "ayega", "aaega": "ayega", "mein": "me", "nahin": "nahi",
     "nahi": "nhi", "kab": "kb", "hai": "h", "karna": "krna", "karein": "kren", "kaise": "kese",
     "paisa": "pesa", "paise": "pese", "mujhe": "mje", "abhi": "abi", "bataiye": "btaiye", "batao": "btao",
-    "kyun": "kyu", "raha": "rha", "rahi": "rhi", "kitna": "kitna", "chahiye": "chahiye",
+    "kyun": "kyu", "raha": "rha", "rahi": "rhi", "chahiye": "chaiye",
 }
 _VOWELS = "aeiou"
 

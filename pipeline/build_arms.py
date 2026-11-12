@@ -87,6 +87,12 @@ def build_arms(n: int, seed: int) -> None:
     print(f"A1={len(a1)} A2={len(a2)} dev={len(dev)}; strata={dict(sorted(targets.items()))}")
 
 
+def source_text(row: dict) -> str:
+    """Text of every gold passage (two for multi-passage rows), so the reviewer sees all the evidence."""
+    by_pid = {p["pid"]: p["text"] for p in row["passages"]}
+    return "\n---\n".join(by_pid.get(pid, "") for pid in row.get("source_pids") or [row.get("source_pid")])
+
+
 def write_review() -> None:
     rows = read_jsonl(DATA / "curated" / "test.jsonl")
     path = DATA / "test" / "review.csv"
@@ -95,8 +101,7 @@ def write_review() -> None:
         w = csv.writer(f)
         w.writerow(["row_id", "lang", "kind", "question", "answer", "source_passage", "keep"])
         for r in rows:
-            src = next((p["text"] for p in r["passages"] if p["pid"] == r.get("source_pid")), "")
-            w.writerow([r["row_id"], r["lang"], r["kind"], r["question"], r["answer"], src, ""])
+            w.writerow([r["row_id"], r["lang"], r["kind"], r["question"], r["answer"], source_text(r), ""])
     print(f"wrote {path}: fill keep with y or n for every row, then run freeze")
 
 

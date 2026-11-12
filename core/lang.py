@@ -51,3 +51,13 @@ def detect(text: str) -> str:
     if hits >= 2 or (hits >= 1 and hits / len(latin_words) >= 0.15):
         return HI_LATN
     return EN
+
+
+def reply_lang(question_lang: str) -> str:
+    return EN if question_lang == OTHER else question_lang
+
+
+def answer_lang_ok(answer: str, expected: str) -> bool:
+    """Answers with no letters (amounts, dates) carry no language, so they fit any expected language."""
+    got = detect(answer)
+    return got == expected or (got == OTHER and not any(ch.isalpha() for ch in answer))

@@ -45,15 +45,14 @@ def verdict(row: dict, resp: dict, topics: dict, grade=None) -> dict:
     kind = row.get("kind", "answerable" if row["answerable"] else "unanswerable")
     expected_abstain = not row["answerable"]
     pred_abstain = resp["status"] != "ok"
-    q_lang = langmod.detect(row["question"])
-    reply_lang = langmod.EN if q_lang == langmod.OTHER else q_lang
+    reply_lang = langmod.reply_lang(langmod.detect(row["question"]))
     v = {
         "row_id": row["row_id"], "kind": kind, "lang": row["lang"],
         "topic": topics.get(row.get("provenance", {}).get("source_doc", ""), row.get("attack_type") or "other"),
         "expected_abstain": expected_abstain, "pred_abstain": pred_abstain, "status": resp["status"],
         "schema": resp.get("checks", {}).get("schema", "n/a"),
         "claim_check": resp.get("checks", {}).get("claim_check", "n/a"),
-        "lang_ok": (langmod.detect(resp["answer"]) == reply_lang) if resp["status"] == "ok" else None,
+        "lang_ok": langmod.answer_lang_ok(resp["answer"], reply_lang) if resp["status"] == "ok" else None,
         "judge_correct": None, "judge_supported": None, "answer": resp["answer"],
         "cited_pids": [c["pid"] for c in resp.get("citations", [])],
     }

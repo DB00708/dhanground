@@ -110,4 +110,5 @@ def test_verdict_other_language_expects_english():
     row = {"row_id": "ta-0", "lang": "other", "question": "UPI பணம் எப்போது திரும்ப வரும்?", "answerable": True}
     english = verdict(row, {"status": "ok", "answer": "Refund latest on T + 1 day"}, {})
     tamil = verdict(row, {"status": "ok", "answer": "T + 1 நாளில் பணம் திரும்ப வரும்"}, {})
-    assert english["lang_ok"] is True and tamil["lang_ok"] is False
+    numeric = verdict(row, {"status": "ok", "answer": "10,000"}, {})
+    assert english["lang_ok"] is True and tamil["lang_ok"] is False and numeric["lang_ok"] is True

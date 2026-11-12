@@ -105,3 +105,17 @@ def test_other_language_non_english_answer_abstains_in_english():
     r = _tamil_answer("T + 1 நாளில் பணம் திரும்ப வரும் [rbi-11693-p15]")
     assert r["status"] == "abstained" and r["abstain_reason"] == "language"
     assert r["answer"] == ABSTAIN_MESSAGES["en"] and r["lang"] == "en" and "Hinglish" in r["note"]
+
+
+def test_other_language_numeric_answer_served():
+    r = _tamil_answer("10,000")
+    assert r["status"] == "ok" and "note" in r
+
+
+def test_other_language_note_on_gate_and_timeout(index_dir):
+    gated = AnswerEngine(FakeGen([]), Retriever(index_dir), tau=1e9).answer(TAMIL_Q, "A3").response
+    timed = AnswerEngine(FakeGen([TimeoutGeneration("A3")]), retriever=None).answer(
+        TAMIL_Q, "A3", passages=UPI_PASSAGES).response
+    assert gated["abstain_reason"] == "retrieval" and "Hinglish" in gated["note"]
+    assert gated["answer"] == ABSTAIN_MESSAGES["en"]
+    assert timed["status"] == "timeout" and "Hinglish" in timed["note"]

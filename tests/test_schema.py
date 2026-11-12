@@ -64,6 +64,11 @@ def test_lang_mismatch_is_logged_not_blocked():
     assert v.status == "ok" and v.checks["lang"] == "fail"
 
 
+def test_english_reply_to_unsupported_language_passes_lang_check():
+    v = validate(out(lang="en", answer="Reversal by T + 1 day [rbi-11693-p15]"), PASSAGES, "UPI பணம் எப்போது வரும்?")
+    assert v.status == "ok" and v.checks["lang"] == "pass"
+
+
 def test_truncate_at_sentence_boundary():
     text = ("word " * 70).strip() + ". " + ("more " * 70).strip() + "."
     t = truncate_words(text)

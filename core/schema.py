@@ -148,6 +148,6 @@ def validate(output: ModelOutput, passages: list[Passage], question: str) -> Val
     answer = truncate_words(output.answer)
     cc = claimcheck.check(answer, [by_pid[pid].text for pid in cited])
     checks["claim_check"] = cc.status
-    checks["lang"] = "pass" if output.lang == question_lang else "fail"
+    checks["lang"] = "pass" if output.lang == reply_lang else "fail"
 
     return Validated("ok", True, answer, output.lang, cited, checks, None, cc.unsupported)

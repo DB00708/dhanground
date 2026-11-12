@@ -83,15 +83,15 @@ class AnswerEngine:
 
     def answer(self, question: str, arm: str, request_id: str = "", passages: list[dict] | None = None,
                show_passages: bool = False) -> EngineResult:
-        result = self._answer(question, arm, request_id, passages, show_passages)
-        if langmod.detect(question) == langmod.OTHER:
+        q_lang = langmod.detect(question)
+        result = self._answer(question, q_lang, arm, request_id, passages, show_passages)
+        if q_lang == langmod.OTHER:
             result.response["note"] = UNSUPPORTED_NOTE
         return result
 
-    def _answer(self, question: str, arm: str, request_id: str, passages: list[dict] | None,
+    def _answer(self, question: str, q_lang: str, arm: str, request_id: str, passages: list[dict] | None,
                 show_passages: bool) -> EngineResult:
         start = time.monotonic()
-        q_lang = langmod.detect(question)
         reply_lang = q_lang if q_lang in ABSTAIN_MESSAGES else "en"
         base = {"request_id": request_id, "arm": arm, "source": "live",
                 "index_version": getattr(self.retriever, "index_version", None)}
@@ -129,7 +129,7 @@ class AnswerEngine:
                 "schema": "fail", "citations": "n/a", "claim_check": "n/a"}), raw_outputs)
 
         v = validate(output, typed, question)
-        if q_lang == langmod.OTHER and v.status == "ok" and langmod.detect(v.answer) != langmod.EN:
+        if q_lang == langmod.OTHER and v.status == "ok" and not langmod.answer_lang_ok(v.answer, langmod.EN):
             return EngineResult(self._abstained(base, "en", "language", start, passages, show_passages, {
                 k: v.checks.get(k, "n/a") for k in ("schema", "citations", "claim_check")}), raw_outputs)
         by_pid = {p["pid"]: p for p in passages}

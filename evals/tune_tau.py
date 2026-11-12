@@ -40,6 +40,10 @@ def choose_tau(answerable: list[float], unanswerable: list[float], max_gated: fl
     """Highest tau gating at most max_gated of answerable scores, plus a small curve for the report."""
     if not answerable:
         raise ValueError("need at least one answerable dev question to set tau")
+    if not 0.0 <= max_gated < 1.0:
+        raise ValueError(f"max_gated must be in [0, 1), got {max_gated}")
+    if not all(math.isfinite(s) for s in [*answerable, *unanswerable]):
+        raise ValueError("gate scores must be finite")
     a = sorted(answerable)
     tau = _tau_at(a, max_gated)
     curve = [{"quantile": q, "tau": t, "answerable_gated": _share_below(a, t),
@@ -49,10 +53,20 @@ def choose_tau(answerable: list[float], unanswerable: list[float], max_gated: fl
             "unanswerable_caught": _share_below(unanswerable, tau), "curve": curve}
 
 
+def _yaml_float(x: float) -> str:
+    """Shortest exact repr that YAML 1.1 (PyYAML) reads back as a float: it needs a dot in the
+    mantissa, so 1e-05 must be written 1.0e-05."""
+    s = repr(float(x))
+    if "e" in s and "." not in s.split("e")[0]:
+        mant, exp = s.split("e")
+        s = f"{mant}.0e{exp}"
+    return s
+
+
 def replace_tau(config_text: str, tau: float) -> str:
     """Replace only the value on the top-level `tau:` line, keeping its comment and every other line."""
     def sub(m: re.Match) -> str:
-        old, new, rest = m.group(2), repr(float(tau)), m.group(3)
+        old, new, rest = m.group(2), _yaml_float(tau), m.group(3)
         comment = rest.lstrip(" \t")
         if comment.strip():  # keep the comment in its column when the new value fits
             rest = " " * max(1, len(old) + len(rest) - len(comment) - len(new)) + comment
@@ -61,6 +75,8 @@ def replace_tau(config_text: str, tau: float) -> str:
     new_text, n = _TAU_LINE.subn(sub, config_text, count=1)
     if n != 1:
         raise ValueError("no top-level `tau:` line found in the retrieval config")
+    if yaml.safe_load(new_text).get("tau") != float(tau):
+        raise ValueError("rewritten config does not read back the same tau")
     return new_text
 
 

@@ -83,6 +83,8 @@ python -m evals.roi --measure --arm A3 --p-in <vendor $/1M in> --p-out <vendor $
 **Demo.** `python -m apps.api.build_cache --index index/rbi-2026-11-10` caches the 30 examples for all
 arms, then `python -m apps.space.app` serves the API and UI on port 7860. On an HF Space set
 `app_file: apps/space/app.py`. With `DEMO_MODE=cached` or no GPU, it serves labeled cached answers.
+About 10 minutes before the slot, run `python -m scripts.warmup --url https://<space>.hf.space`; it waits
+out the cold start and exits non-zero unless the GPU is up and all 4 arms answer live.
 
 ## Contracts
 

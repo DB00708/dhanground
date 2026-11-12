@@ -34,8 +34,10 @@ def wait_for_health(client: httpx.Client, sleep: Callable, clock: Callable, out:
     start, delay, attempt = clock(), BACKOFF_START_S, 0
     while True:
         attempt += 1
-        try:
-            r = client.get("/v1/health")
+        remaining = max(max_wait - (clock() - start), 0.1)
+        configured = client.timeout.read
+        try:  # cap each GET so the total wait stays within max_wait
+            r = client.get("/v1/health", timeout=min(configured, remaining) if configured else remaining)
             if r.status_code == 200:
                 return r.json()
             why = f"HTTP {r.status_code}"
@@ -73,8 +75,9 @@ class Pacer:
         self.sent.append(self.clock())
 
 
-def ask(client: httpx.Client, session: str, question: str, arm: str, sleep: Callable, clock: Callable) -> dict:
-    body = {"request_id": f"warmup-{uuid.uuid4().hex}", "question": question, "arm": arm}
+def ask(client: httpx.Client, session: str, question: str, arm: str, sleep: Callable, clock: Callable,
+        pacer: Pacer) -> dict:
+    body = {"request_id": f"warmup-{uuid.uuid4().hex}", "question": question, "arm": arm, "show_passages": False}
     t0 = clock()
     for attempt in range(2):
         try:
@@ -90,6 +93,7 @@ def ask(client: httpx.Client, session: str, question: str, arm: str, sleep: Call
         err = data.get("error") or {}
         if r.status_code == 429 and attempt == 0:  # pacing should prevent this; honour retry_after once
             sleep(float(err.get("retry_after_s", 60)))
+            pacer.wait()  # the retry is a send too
             continue
         if data.get("status") == "error":
             data["reason"] = err.get("code", f"HTTP {r.status_code}")
@@ -120,10 +124,15 @@ def _run(client, per_tag, sleep, clock, out, max_wait) -> int:
         return EXIT_NOT_READY
 
     try:
-        examples = client.get("/v1/examples").json().get("examples", [])
+        r = client.get("/v1/examples")
+        body = r.json() if r.status_code == 200 else None
     except (httpx.HTTPError, ValueError) as e:
         out(f"FAIL: could not read /v1/examples ({type(e).__name__})")
         return EXIT_FAILED
+    if not isinstance(body, dict) or not isinstance(body.get("examples", []), list):
+        out(f"FAIL: /v1/examples HTTP {r.status_code}" + ("" if r.status_code != 200 else " (unexpected body)"))
+        return EXIT_FAILED
+    examples = [e for e in body.get("examples", []) if isinstance(e, dict)]
     questions = pick_questions(examples, per_tag)
     missing = [t for t in TAGS if not any(q["tag"] == t for q in questions)]
     if missing:
@@ -135,7 +144,7 @@ def _run(client, per_tag, sleep, clock, out, max_wait) -> int:
     for q in questions:
         for arm in ARMS:
             pacer.wait()
-            resp = ask(client, session, q["question"], arm, sleep, clock)
+            resp = ask(client, session, q["question"], arm, sleep, clock, pacer)
             rows.append((arm, q["tag"], resp))
 
     failures = []

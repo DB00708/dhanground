@@ -287,7 +287,8 @@ def load_paragraphs(index_dir: Path, splits: dict[str, list[str]], cfg: dict | N
     passages = [json.loads(l) for l in (index_dir / "passages.jsonl").open(encoding="utf-8")]
     kept, dropped = relevance.consumer_passages(
         [p for p in passages if p["doc_id"] in doc_split],
-        cfg.get("exclude_chapters") or {}, cfg.get("exclude_terms") or [], cfg.get("keep_spans") or {})
+        cfg.get("exclude_chapters") or {}, cfg.get("exclude_terms") or [], cfg.get("keep_spans") or {},
+        cfg.get("exclude_spans") or {})
     if dropped:
         print(f"skipping {sum(dropped.values())} non-consumer passages for generation: {dropped}")
     out: dict[str, list[dict]] = {s: [] for s in splits}

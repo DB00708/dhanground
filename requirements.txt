@@ -1,4 +1,4 @@
-# CPU side: ingest, splits, BM25 retrieval, curation gates, API, tests.
+# CPU side: ingest, splits, retrieval, teacher generation, curation gates, API, summary chart, tests.
 pydantic==2.14.3
 PyYAML==6.0.3
 requests==2.34.2
@@ -8,5 +8,9 @@ rank-bm25==0.2.2
 numpy==2.4.6
 fastapi==0.162.2
 httpx==0.28.1
-uvicorn
+uvicorn==0.54.0
+curatorkit==0.1.24
+litellm==1.109.1
+sentence-transformers==6.3.0
+matplotlib==3.11.2
 pytest==9.2.0

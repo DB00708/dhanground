@@ -27,6 +27,7 @@ Research demo, not financial or legal advice. Tiny Aya weights are non-commercia
 | `retrieval/` | 7 hybrid BM25 + multilingual embedding retriever |
 | `serving/`, `apps/api/` | 8 answer service, `/v1` FE↔BE contract |
 | `apps/space/` | 9 Gradio demo (mounted on the API server) |
+| `notebooks/` | `01_ingest` … `07_roi`: one notebook per stage, same calls as the Runbook below |
 
 ## Runbook
 
@@ -57,6 +58,7 @@ python -m pipeline.curate
 python -m pipeline.build_arms arms
 python -m pipeline.build_arms review          # fill keep=y/n in data/test/review.csv
 python -m pipeline.build_arms freeze --index index/rbi-2026-11-10
+python -m evals.make_test_card                  # evals/test_set_card.md
 ```
 
 **Train A1, A2 (3 seeds each), mine pairs, train A3.**
@@ -85,6 +87,19 @@ arms, then `python -m apps.space.app` serves the API and UI on port 7860. On an 
 `app_file: apps/space/app.py`. With `DEMO_MODE=cached` or no GPU, it serves labeled cached answers.
 About 10 minutes before the slot, run `python -m scripts.warmup --url https://<space>.hf.space`; it waits
 out the cold start and exits non-zero unless the GPU is up and all 4 arms answer live.
+
+**Publish.** Dry run first: it prints repo ids, files, row counts and sizes, and refuses if an input is missing
+or `data/test/test.jsonl` does not match `test.sha256`. Then push (private), check the repos, and make them public.
+
+```bash
+python scripts/publish_hf.py --org <org>
+python scripts/publish_hf.py --org <org> --push
+python scripts/publish_hf.py --org <org> --push --public
+```
+
+This creates the datasets `dhanground-rbi-corpus`, `dhanground-hinglish-qa` (curated splits, gate log, frozen
+test set, eval results and traces, training logs) and `dhanground-dpo-pairs`, each with a dataset card, and two collections: "DhanGround datasets"
+(the three datasets) and "DhanGround models" (the base model and every `<org>/dhanground-*` adapter repo). Report toolkit bugs in `docs/upstream_issues.md`.
 
 ## Contracts
 

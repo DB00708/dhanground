@@ -145,6 +145,7 @@ def train_trl(base: str, rows: list[dict], out: Path, lora: dict, seed: int) -> 
                           target_modules=lora["lora"]["target_modules"], task_type="CAUSAL_LM")
     trainer = SFTTrainer(model=model, args=args, train_dataset=ds, processing_class=tok, peft_config=peft_cfg)
     ckpt = resume_checkpoint(out)
+    print(f"resuming from {ckpt}" if ckpt else "starting from step 0", flush=True)
     trainer.train(resume_from_checkpoint=str(ckpt) if ckpt else None)
     trainer.save_model(str(out))
 
@@ -175,7 +176,8 @@ def main() -> None:
     check_render(AutoTokenizer.from_pretrained(base), rows, lora["sft"]["assistant_only_loss"])
     if a.resume_from_hub:
         restored = restore_latest_checkpoint(a.resume_from_hub, out)
-        print(f"resuming from {restored}" if restored else f"no complete checkpoint in {a.resume_from_hub}; starting fresh")
+        print(f"restored {restored} from {a.resume_from_hub}" if restored
+              else f"no complete checkpoint in {a.resume_from_hub}")
     elif a.backend == "aligntune" and repo:
         print("note: AlignTune runs cannot resume; if this GPU session may die, use --backend trl")
 

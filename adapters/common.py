@@ -53,20 +53,25 @@ class CheckpointSync:
         if self.repo_id:
             self._stop.set()
             self._thread.join()
-            self.sync()
+            self.sync()  # never raises; a checkpoint that still fails stays local and is reported
 
     def _loop(self):
         while not self._stop.wait(self.every_s):
             self.sync()
 
     def sync(self):
+        """Upload finished checkpoints not yet on the Hub. A failed upload is retried on the next call."""
         from huggingface_hub import upload_folder
 
         for ckpt in sorted(self.output_dir.glob("checkpoint-*")):
             # transformers writes trainer_state.json last, so its presence marks a finished save
             if ckpt.name in self.sent or not (ckpt / "trainer_state.json").exists():
                 continue
-            upload_folder(repo_id=self.repo_id, folder_path=str(ckpt), path_in_repo=f"checkpoints/{ckpt.name}")
+            try:
+                upload_folder(repo_id=self.repo_id, folder_path=str(ckpt), path_in_repo=f"checkpoints/{ckpt.name}")
+            except Exception as e:  # network / Hub error: keep training, retry next tick
+                print(f"warning: upload of {ckpt.name} to {self.repo_id} failed, will retry: {e!r}", flush=True)
+                continue
             self.sent.add(ckpt.name)
 
 

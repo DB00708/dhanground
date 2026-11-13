@@ -52,7 +52,8 @@ def main() -> None:
     repo = a.resume_from_hub or (f"{a.hub_org}/dhanground-{name}" if a.hub_org else None)
     if a.resume_from_hub:
         restored = restore_latest_checkpoint(a.resume_from_hub, out)
-        print(f"resuming from {restored}" if restored else f"no complete checkpoint in {a.resume_from_hub}; starting fresh")
+        print(f"restored {restored} from {a.resume_from_hub}" if restored
+              else f"no complete checkpoint in {a.resume_from_hub}")
 
     rows = [json.loads(l) for l in a.pairs.open(encoding="utf-8") if l.strip()]
     ds = Dataset.from_list([{"prompt": r["prompt"], "chosen": r["chosen"], "rejected": r["rejected"]} for r in rows])
@@ -69,6 +70,7 @@ def main() -> None:
     with CheckpointSync(out, repo):
         trainer = DPOTrainer(model=model, args=args, train_dataset=ds, processing_class=tok)  # adds "ref"
         ckpt = resume_checkpoint(out)
+        print(f"resuming from {ckpt}" if ckpt else "starting from step 0", flush=True)
         if ckpt:
             restore_policy(trainer.model, ckpt)
         trainer.train(resume_from_checkpoint=str(ckpt) if ckpt else None)

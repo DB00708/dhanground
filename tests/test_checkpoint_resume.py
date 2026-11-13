@@ -136,3 +136,53 @@ def test_name_from_repo_keeps_original_sha_and_checks_arm_seed():
         name_from_repo("org/dhanground-A2-s0-abc1234", "A2", 1)
     with pytest.raises(SystemExit):
         name_from_repo("org/dhanground-A1-s0-abc1234", "A2", 0)
+
+
+def test_sync_survives_failed_upload_and_retries(monkeypatch, tmp_path):
+    uploads, fail = [], {"left": 1}
+
+    def upload_folder(repo_id, folder_path, path_in_repo):
+        if fail["left"]:
+            fail["left"] -= 1
+            raise OSError("hub down")
+        uploads.append(path_in_repo)
+
+    mod = types.SimpleNamespace(create_repo=lambda *a, **k: None, list_repo_files=lambda r: [],
+                                upload_folder=upload_folder)
+    monkeypatch.setitem(sys.modules, "huggingface_hub", mod)
+    _ckpt(tmp_path, 200)
+    sync = CheckpointSync(tmp_path, REPO, every_s=3600)
+    sync.sync()  # fails, must not raise
+    assert uploads == [] and "checkpoint-200" not in sync.sent
+    sync.sync()
+    assert uploads == ["checkpoints/checkpoint-200"]
+
+
+def test_exit_does_not_raise_when_final_upload_fails(monkeypatch, tmp_path):
+    def upload_folder(**kw):
+        raise OSError("hub down")
+
+    mod = types.SimpleNamespace(create_repo=lambda *a, **k: None, list_repo_files=lambda r: [],
+                                upload_folder=upload_folder)
+    monkeypatch.setitem(sys.modules, "huggingface_hub", mod)
+    with CheckpointSync(tmp_path, REPO, every_s=3600):
+        _ckpt(tmp_path, 200)
+    # reaching here means the training script goes on to save and push the final adapter
+
+
+def test_restore_replaces_partial_dst_and_stale_staging(monkeypatch, tmp_path):
+    files = ["checkpoints/checkpoint-600/trainer_state.json", "checkpoints/checkpoint-600/adapter_model.safetensors"]
+    calls = []
+    _fake_hub(monkeypatch, files, calls)
+    partial = tmp_path / "checkpoint-600"
+    partial.mkdir()
+    (partial / "optimizer.pt").write_text("half-written")  # no trainer_state.json
+    stale = tmp_path / ".hub_restore" / "checkpoints" / "checkpoint-400"
+    stale.mkdir(parents=True)
+    (stale / "trainer_state.json").write_text("{}")  # left by an earlier crashed restore
+
+    got = restore_latest_checkpoint(REPO, tmp_path)
+
+    assert got == partial
+    assert sorted(p.name for p in got.iterdir()) == ["adapter_model.safetensors", "trainer_state.json"]
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["checkpoint-600"]

@@ -18,8 +18,8 @@ import argparse
 import json
 from pathlib import Path
 
-from adapters.common import (CheckpointSync, adapter_name, load_configs, name_from_repo, push_adapter,
-                             restore_latest_checkpoint, resume_checkpoint)
+from adapters.common import (CheckpointSync, adapter_name, load_configs, name_from_repo, precision, push_adapter,
+                             restore_latest_checkpoint, resume_checkpoint, torch_dtype)
 
 # AlignTune's SystemPromptInjector puts this on every messages row; TRL forwards it to apply_chat_template.
 TEMPLATE_KWARGS = {"enable_thinking": False}
@@ -122,7 +122,7 @@ def train_aligntune(base: str, data_dir: Path, out: Path, lora: dict, seed: int,
         lora_alpha=lora["lora"]["alpha"],
         lora_dropout=lora["lora"]["dropout"],
         lora_target_modules=lora["lora"]["target_modules"],
-        precision="bf16",
+        precision=precision(lora),
         seed=seed,
         save_steps=sft["checkpoint_every_steps"],
         report_to="none",
@@ -154,12 +154,13 @@ def train_trl(base: str, rows: list[dict], out: Path, lora: dict, seed: int) -> 
     sft = lora["sft"]
     ds = Dataset.from_list(trl_rows(rows))
     tok = AutoTokenizer.from_pretrained(base)
-    model = AutoModelForCausalLM.from_pretrained(base, torch_dtype=torch.bfloat16)
+    p = precision(lora)
+    model = AutoModelForCausalLM.from_pretrained(base, torch_dtype=torch_dtype(p))
     args = SFTConfig(  # mirrors what AlignTune 0.1.33's build_sft_config sets for train_aligntune above
         output_dir=str(out), num_train_epochs=sft["epochs"], per_device_train_batch_size=sft["per_device_batch_size"],
         gradient_accumulation_steps=grad_accum(sft), loss_type=sft["loss_type"], learning_rate=sft["lr"],
         lr_scheduler_type=sft["scheduler"], warmup_steps=sft["warmup_ratio"], weight_decay=sft["weight_decay"],
-        optim="adamw_torch", max_length=sft["max_len"], bf16=True, seed=seed, padding_free=False,
+        optim="adamw_torch", max_length=sft["max_len"], bf16=p == "bf16", fp16=p == "fp16", seed=seed, padding_free=False,
         save_steps=sft["checkpoint_every_steps"], logging_steps=10, report_to="none",
         assistant_only_loss=sft["assistant_only_loss"], gradient_checkpointing=True,
     )
@@ -210,7 +211,8 @@ def main() -> None:
         else:
             train_trl(base, rows, out, lora, a.seed)
     (out / "dhanground.json").write_text(json.dumps({"arm": a.arm, "seed": a.seed, "base": base,
-                                                     "backend": a.backend, "name": name}, indent=2))
+                                                     "backend": a.backend, "precision": precision(lora),
+                                                     "name": name}, indent=2))
     if repo:
         push_adapter(out, repo)
     print(f"adapter: {out}" + (f" (pushed to {repo})" if repo else ""))

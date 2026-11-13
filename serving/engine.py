@@ -38,7 +38,9 @@ class HFGenerator:
 
         self.torch = torch
         self.tokenizer = AutoTokenizer.from_pretrained(base_model)
-        model = AutoModelForCausalLM.from_pretrained(base_model, torch_dtype=torch.bfloat16, device_map=device)
+        from adapters.common import precision, torch_dtype
+
+        model = AutoModelForCausalLM.from_pretrained(base_model, torch_dtype=torch_dtype(precision()), device_map=device)
         self.arms = {"A0"}
         if adapters:
             first, *rest = adapters.items()

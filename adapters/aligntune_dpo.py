@@ -14,8 +14,8 @@ import argparse
 import json
 from pathlib import Path
 
-from adapters.common import (CheckpointSync, adapter_name, load_configs, name_from_repo, push_adapter,
-                             restore_latest_checkpoint, resume_checkpoint)
+from adapters.common import (CheckpointSync, adapter_name, load_configs, name_from_repo, precision, push_adapter,
+                             restore_latest_checkpoint, resume_checkpoint, torch_dtype)
 
 
 def restore_policy(model, ckpt: Path) -> None:
@@ -58,12 +58,13 @@ def main() -> None:
     rows = [json.loads(l) for l in a.pairs.open(encoding="utf-8") if l.strip()]
     ds = Dataset.from_list([{"prompt": r["prompt"], "chosen": r["chosen"], "rejected": r["rejected"]} for r in rows])
     tok = AutoTokenizer.from_pretrained(base)
-    model = AutoModelForCausalLM.from_pretrained(base, torch_dtype=torch.bfloat16)
+    p = precision(lora)
+    model = AutoModelForCausalLM.from_pretrained(base, torch_dtype=torch_dtype(p))
     model = PeftModel.from_pretrained(model, a.a2, is_trainable=True)  # adapter "default"
 
     args = DPOConfig(
         output_dir=str(out), num_train_epochs=dpo["epochs"], learning_rate=dpo["lr"], beta=dpo["beta"],
-        per_device_train_batch_size=2, gradient_accumulation_steps=8, bf16=True, seed=a.seed,
+        per_device_train_batch_size=2, gradient_accumulation_steps=8, bf16=p == "bf16", fp16=p == "fp16", seed=a.seed,
         max_length=lora["sft"]["max_len"] + 384, save_steps=dpo["checkpoint_every_steps"], logging_steps=5,
         report_to="none", gradient_checkpointing=True,
     )
@@ -78,7 +79,7 @@ def main() -> None:
     final = out / "final"
     trainer.model.save_pretrained(str(final), selected_adapters=["default"])  # "default" saves at the folder root
     (final / "dhanground.json").write_text(json.dumps({"arm": "A3", "seed": a.seed, "base": base, "init": a.a2,
-                                                       "backend": "trl-dpo", "name": name}, indent=2))
+                                                       "backend": "trl-dpo", "precision": p, "name": name}, indent=2))
     if repo:
         push_adapter(final, repo)
     print(f"adapter: {final}" + (f" (pushed to {repo})" if repo else ""))

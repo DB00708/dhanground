@@ -74,6 +74,14 @@ Review and integration results are logged in tests/e2e/INTEGRATION_LOG.md on the
 | 2026-11-12 | T3 | Reviewer APPROVED | claude/data-gen-0f329e @ 2d44de9 | 1 should-fix (review.csv showed only the first passage) + 2 nits fixed; decision: typo and two-passage questions also in dev/test, reported as their own slice |
 | 2026-11-13 | T1+T2 | MERGED to main | main @ ea25de3 | with the e2e harness (498297d); 109 unit tests; native e2e 9/9 PASS in 82 s incl. warm-up across 4 arms; pushed to https://github.com/DB00708/dhanground (public) |
 | 2026-11-13 | T7 | Reviewer CHANGES REQUESTED | claude/train-resume-d748e9 @ d73a895 | no blockers; 1 should-fix: a failed Hub upload kills the checkpoint-sync thread and can block the A3 final save; download layout, latest-checkpoint pick, trl 1.7.1 DPO changes, DPO restore and "AlignTune can't resume" all verified against library source; A3 resume untested on GPU |
+| 2026-11-13 | T3+T4, T5+T6, T9+T10 | MERGED to main | 6c1eaa9, 9e71290, c1395e7 | all reviewer-approved (later commits on each branch touched only the sibling task); 216 tests; e2e 9/9 PASS |
+| 2026-11-13 | T7+T8 | MERGED to main | 20bdf92 | T7 @ 0711d8b, T8 @ 992fdb9 (later commits T8-only) |
+| 2026-11-13 | coupling fix | main | a858e7e | notebook 04 → adapters.train_arm + resume cell (T8 × T9); 239 tests; pushed |
+| 2026-11-13 | real run | main | ebe3780 | Gemini teacher (3.6 Flash) / judge (3.1 Pro) verified; embedding index rbi-2026-11-13 (e5-small); generation running; output-token budgets raised for thinking models |
+| 2026-11-13 | T11 | Budget plan | claude/hf-jobs-f8e090 @ 92b01c2 (in review) | HF Jobs need credit balance > 0 (not PRO); GPU Spaces need PRO, so the demo is a free CPU Space in cached mode. Full run ≈ $20–25 at $0.80/h. Priority if short: probe → stage → smoke → A1 s0, A2 s0 → A2 dev eval → mine → DPO (A3) → test evals s0 → seeds 1–2 |
+| 2026-11-13 | T1–T10 | Integration PASS (Docker) | main @ a6e6480 (integration 37bb401) | 235 unit passed / 4 skipped; e2e 10/10 in 82 s incl. evals.summarize; image installs CPU torch then requirements.txt |
+| 2026-11-13 | compute | Decision | — | HF rejects Indian cards; rules allow training anywhere (only artifacts on HF). Primary compute = Kaggle T4 ×2, fp16 run-wide (account divyanshbhatia007, token verified); T11 extended with a Kaggle backend + precision setting |
+| 2026-11-13 | real run | Generation DONE | main @ ebe3780 | 6,100 raw rows (train 5,000 / dev 400 / test 700); 81% answerable, 19% unanswerable, 4% adversarial; 228 typo, 439 two-passage; 0 failed jobs after token fix; curation trial on dev running (Gemini 3.1 Pro judge) |
 | 2026-11-12 | T5 | Reviewer APPROVED | claude/eval-set-cc3068 @ c427d83 | tau tuning only; 3 optional nits, no blockers |
 
 ## Edge-case catalog (design: 20 cases)

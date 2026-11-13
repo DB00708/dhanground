@@ -10,6 +10,27 @@ from pathlib import Path
 import yaml
 
 
+PRECISIONS = ("bf16", "fp16")
+
+
+def precision(lora: dict | None = None) -> str:
+    """Run-wide training/serving precision: DHANGROUND_PRECISION, else configs/lora.yaml. fp16 is for T4 GPUs (no bf16)."""
+    import os
+
+    if lora is None:
+        lora = load_configs()[1]
+    p = os.environ.get("DHANGROUND_PRECISION") or lora.get("precision", "bf16")
+    if p not in PRECISIONS:
+        raise SystemExit(f"precision must be one of {PRECISIONS}, got {p!r}")
+    return p
+
+
+def torch_dtype(p: str):
+    import torch
+
+    return torch.bfloat16 if p == "bf16" else torch.float16
+
+
 def load_configs() -> tuple[dict, dict]:
     arms = yaml.safe_load(Path("configs/arms.yaml").read_text(encoding="utf-8"))
     lora = yaml.safe_load(Path("configs/lora.yaml").read_text(encoding="utf-8"))

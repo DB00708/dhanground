@@ -4,7 +4,7 @@ lora:
   dropout: 0.05
   target_modules: all-linear
 
-precision: bf16   # never 4-bit training, never T4 (fp16 GradScaler crash)
+precision: bf16   # run-wide; DHANGROUND_PRECISION=fp16 for T4 GPUs (Kaggle). Never 4-bit. One precision per run.
 
 sft:
   epochs: 2

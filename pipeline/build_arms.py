@@ -105,6 +105,39 @@ def write_review() -> None:
     print(f"wrote {path}: fill keep with y or n for every row, then run freeze")
 
 
+def adversarial_passages(retriever, question: str, gold_pids: list[str], k: int = 4) -> list[dict]:
+    """Frozen passages for one adversarial row: every gold passage, filled with retrieved hits to k.
+
+    Retrieval alone misses the gold passage for many hand-written rows (weak for Hindi), and a
+    grounded model must then abstain, so an expected-answer row could never be answered correctly.
+    Passages are ordered newest first, as serving orders them, so position does not reveal gold.
+    """
+    hits = retriever.search(question, k=len(retriever.passages))
+    score = {h.pid: h.score for h in hits}
+    by_pid = {p["pid"]: p for p in retriever.passages}
+    missing = [pid for pid in gold_pids if pid not in by_pid]
+    if missing:
+        raise SystemExit(f"gold pids not in the index: {missing}")
+    chosen = list(dict.fromkeys(gold_pids))
+    chosen += [h.pid for h in hits if h.pid not in chosen][: max(0, k - len(chosen))]
+    chosen.sort(key=lambda pid: str(by_pid[pid]["date"]), reverse=True)
+    return [{"pid": pid, "text": by_pid[pid]["text"], "score": round(score.get(pid, 0.0), 4)} for pid in chosen]
+
+
+def adversarial_rows(retriever, rows: list[dict], k: int = 4) -> list[dict]:
+    out = []
+    for i, a in enumerate(rows):
+        gold = a.get("gold_pids", []) if a["expected"] == "answer" else []
+        out.append({
+            "row_id": f"adv-{i:03d}", "lang": a["lang"], "question": a["question"], "kind": "adversarial",
+            "passages": adversarial_passages(retriever, a["question"], gold, k),
+            "answerable": a["expected"] == "answer", "answer": a.get("gold_answer", ""),
+            "cited_pids": gold, "attack_type": a.get("attack_type", ""),
+            "must_not_contain": a.get("must_not_contain", []), "split": "test",
+        })
+    return out
+
+
 def freeze(index_dir: Path, seed: int, allow_unreviewed: bool) -> None:
     from retrieval.search import Retriever
 
@@ -125,16 +158,7 @@ def freeze(index_dir: Path, seed: int, allow_unreviewed: bool) -> None:
     test = rng.sample(answerable, min(TEST_MIX["answerable"], len(answerable)))
     test += rng.sample(unanswerable, min(TEST_MIX["unanswerable"], len(unanswerable)))
 
-    retriever = Retriever(index_dir)
-    for i, a in enumerate(read_jsonl(Path("evals") / "adversarial_test.jsonl")):
-        hits = retriever.search(a["question"], k=4)
-        test.append({
-            "row_id": f"adv-{i:03d}", "lang": a["lang"], "question": a["question"], "kind": "adversarial",
-            "passages": [{"pid": h.pid, "text": h.text, "score": round(h.score, 4)} for h in hits],
-            "answerable": a["expected"] == "answer", "answer": a.get("gold_answer", ""),
-            "cited_pids": a.get("gold_pids", []), "attack_type": a.get("attack_type", ""),
-            "split": "test",
-        })
+    test += adversarial_rows(Retriever(index_dir), read_jsonl(Path("evals") / "adversarial_test.jsonl"))
     path = DATA / "test" / "test.jsonl"
     write_jsonl(path, test)
     digest = hashlib.sha256(path.read_bytes()).hexdigest()

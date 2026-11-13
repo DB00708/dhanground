@@ -12,3 +12,4 @@ index/
 sources/pdf/
 evals/results/*_verdicts.jsonl
 .claude/
+.e2e-work/

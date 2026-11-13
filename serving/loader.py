@@ -19,7 +19,7 @@ def adapter_paths() -> dict[str, str]:
 
 
 def build_engine(index_dir: str | None = None, arms: list[str] | None = None):
-    from serving.engine import AnswerEngine, HFGenerator
+    from serving.engine import AnswerEngine
     from retrieval.search import Retriever
 
     arms_cfg = yaml.safe_load(Path("configs/arms.yaml").read_text(encoding="utf-8"))
@@ -32,4 +32,17 @@ def build_engine(index_dir: str | None = None, arms: list[str] | None = None):
     index_dir = index_dir or os.environ.get("INDEX_DIR")
     if index_dir:
         retriever = Retriever(Path(index_dir), ret_cfg["hybrid"]["bm25_weight"], ret_cfg["hybrid"]["embedding_weight"])
-    return AnswerEngine(HFGenerator(base, paths), retriever, tau=ret_cfg.get("tau"), k=ret_cfg["k"])
+    return AnswerEngine(_generator(base, paths), retriever, tau=ret_cfg.get("tau"), k=ret_cfg["k"])
+
+
+def _generator(base: str, paths: dict[str, str]):
+    """DHANGROUND_GENERATOR=module:Class swaps in a stub generator (e2e tests; no GPU or weights)."""
+    from serving.engine import HFGenerator
+
+    spec = os.environ.get("DHANGROUND_GENERATOR")
+    if not spec:
+        return HFGenerator(base, paths)
+    import importlib
+
+    module, _, cls = spec.partition(":")
+    return getattr(importlib.import_module(module), cls)(base, paths)

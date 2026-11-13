@@ -1,0 +1,12 @@
+.git
+.venv
+.claude
+.e2e-work
+**/__pycache__
+.pytest_cache
+corpus
+index
+sources
+data
+checkpoints
+evals/results

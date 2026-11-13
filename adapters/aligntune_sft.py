@@ -78,6 +78,13 @@ def check_render(tokenizer, rows: list[dict], assistant_only_loss: bool) -> None
                          "Fix the template or the rows before training.")
 
 
+def grad_accum(sft: dict) -> int:
+    n, b = sft["effective_batch_size"], sft["per_device_batch_size"]
+    if n % b:
+        raise SystemExit(f"sft.effective_batch_size {n} is not a multiple of per_device_batch_size {b}")
+    return n // b
+
+
 def train_aligntune(base: str, data_dir: Path, out: Path, lora: dict, seed: int, n_rows: int) -> None:
     from aligntune.core.backend_factory import create_sft_trainer
 
@@ -89,8 +96,9 @@ def train_aligntune(base: str, data_dir: Path, out: Path, lora: dict, seed: int,
         task_type="sft",
         output_dir=str(out),
         num_epochs=sft["epochs"],
-        batch_size=4,
-        gradient_accumulation_steps=sft["effective_batch_size"] // 4,
+        batch_size=sft["per_device_batch_size"],
+        gradient_accumulation_steps=grad_accum(sft),
+        loss_type=sft["loss_type"],
         learning_rate=sft["lr"],
         lr_scheduler=sft["scheduler"],
         warmup_ratio=sft["warmup_ratio"],
@@ -134,8 +142,8 @@ def train_trl(base: str, rows: list[dict], out: Path, lora: dict, seed: int) -> 
     tok = AutoTokenizer.from_pretrained(base)
     model = AutoModelForCausalLM.from_pretrained(base, torch_dtype=torch.bfloat16)
     args = SFTConfig(  # mirrors what AlignTune 0.1.33's build_sft_config sets for train_aligntune above
-        output_dir=str(out), num_train_epochs=sft["epochs"], per_device_train_batch_size=4,
-        gradient_accumulation_steps=sft["effective_batch_size"] // 4, learning_rate=sft["lr"],
+        output_dir=str(out), num_train_epochs=sft["epochs"], per_device_train_batch_size=sft["per_device_batch_size"],
+        gradient_accumulation_steps=grad_accum(sft), loss_type=sft["loss_type"], learning_rate=sft["lr"],
         lr_scheduler_type=sft["scheduler"], warmup_steps=sft["warmup_ratio"], weight_decay=sft["weight_decay"],
         optim="adamw_torch", max_length=sft["max_len"], bf16=True, seed=seed, padding_free=False,
         save_steps=sft["checkpoint_every_steps"], logging_steps=10, report_to="none",

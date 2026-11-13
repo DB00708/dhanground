@@ -23,6 +23,15 @@ def load_arm(arm: str, split: str) -> tuple[list[dict], list[int]]:
     return rows, seeds
 
 
+def seed_backends(arm: str, seeds: list[int], split: str) -> dict[str, str]:
+    """{seed: backend} from each seed's result JSON (run_eval records it from the adapter's dhanground.json)."""
+    out = {}
+    for s in seeds:
+        f = RESULTS / f"{arm}_s{s}_{split}.json"
+        out[str(s)] = json.loads(f.read_text(encoding="utf-8")).get("backend", "unknown") if f.exists() else "unknown"
+    return out
+
+
 def regression_gates(prev: dict | None, cur: dict, general_drop: float | None) -> dict:
     m = {k: v["value"] for k, v in cur.items()}
     gates = {
@@ -56,7 +65,7 @@ def main() -> None:
         drop = None
         if arm in general and "A0" in general:
             drop = 100 * (general["A0"] - general[arm])
-        summary[arm] = {"seeds": seeds, "n_rows": len(rows), "metrics": rep,
+        summary[arm] = {"seeds": seeds, "backends": seed_backends(arm, seeds, a.split), "n_rows": len(rows), "metrics": rep,
                         "gates": regression_gates(prev, rep, drop) if arm != "A0" else {},
                         "general_capability": general.get(arm)}
         prev = rep
@@ -92,6 +101,8 @@ def to_markdown(summary: dict) -> str:
         lines.append("| general_capability | " + " | ".join(
             f"{summary[a]['general_capability']:.3f}" if summary[a].get("general_capability") is not None else "n/a"
             for a in arms) + " |")
+    lines.append("| backend by seed | " + " | ".join(
+        ", ".join(f"s{s}: {b}" for s, b in summary[a].get("backends", {}).items()) or "n/a" for a in arms) + " |")
     return "\n".join(lines) + "\n"
 
 

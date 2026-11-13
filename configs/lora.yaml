@@ -12,7 +12,13 @@ sft:
   scheduler: cosine
   max_len: 3072
   effective_batch_size: 16
+  # per-device batch; grad accumulation = effective_batch_size / this. Same for both backends.
+  # Lower to 1 if nll OOMs on an L4 (full ~262k-vocab logits per token).
+  per_device_batch_size: 2
   checkpoint_every_steps: 200
+  # nll for both backends: AlignTune 0.1.33 accepts only nll or dft (sft/config.py), and trl 1.7.1 would
+  # otherwise default to chunked_nll (same math, different numerics and memory).
+  loss_type: nll
   warmup_ratio: 0.1          # AlignTune's default, set explicitly so the trl backend matches it
   weight_decay: 0.01         # same
   # Loss on assistant tokens only, same for both backends. Needs a chat template TRL can mark with

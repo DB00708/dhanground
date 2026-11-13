@@ -65,6 +65,27 @@ def verdict(row: dict, resp: dict, topics: dict, grade=None) -> dict:
     return v
 
 
+def adapter_provenance(arm: str, adapter: str | None) -> dict:
+    """Which backend trained this adapter, from the dhanground.json the trainer writes next to it.
+
+    A1/A2 seeds are split across AlignTune (seed 0) and plain TRL (other seeds); the report must say so.
+    """
+    if arm == "A0":
+        return {"backend": "base", "adapter_name": None}
+    meta = None
+    if adapter and Path(adapter, "dhanground.json").is_file():
+        meta = json.loads(Path(adapter, "dhanground.json").read_text(encoding="utf-8"))
+    elif adapter:
+        try:
+            from huggingface_hub import hf_hub_download
+
+            meta = json.loads(Path(hf_hub_download(adapter, "dhanground.json")).read_text(encoding="utf-8"))
+        except Exception as e:  # missing file, no network, not a repo id
+            print(f"warning: no dhanground.json for {adapter}: {e!r}")
+    meta = meta or {}
+    return {"backend": meta.get("backend", "unknown"), "adapter_name": meta.get("name")}
+
+
 def evaluate(engine, arm: str, rows: list[dict], use_judge: bool) -> list[dict]:
     from intelligence.judge import grade
 
@@ -96,7 +117,10 @@ def main() -> None:
 
     if a.adapter:
         os.environ[f"ADAPTER_{a.arm}"] = a.adapter
-    from serving.loader import build_engine
+    from serving.loader import adapter_paths, build_engine
+
+    adapter = adapter_paths().get(a.arm)
+    provenance = adapter_provenance(a.arm, adapter)
 
     engine = build_engine(arms=[a.arm])
     rows = load_split(a.split)
@@ -108,7 +132,7 @@ def main() -> None:
         for v in verdicts:
             f.write(json.dumps(v, ensure_ascii=False) + "\n")
     result = {"arm": a.arm, "seed": a.seed, "split": a.split, "n": len(verdicts), "judge": use_judge,
-              "adapter": a.adapter, "metrics": metrics.report(verdicts), "slices": metrics.slices(verdicts)}
+              "adapter": adapter, **provenance, "metrics": metrics.report(verdicts), "slices": metrics.slices(verdicts)}
     Path(f"{stem}.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
     if a.split == "test":
         usage[tag] = datetime.now(timezone.utc).isoformat(timespec="seconds")

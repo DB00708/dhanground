@@ -77,7 +77,8 @@ same LoRA and optimizer settings (`configs/lora.yaml`). Before training, each ru
 tokenizer that the training render starts with the exact prompt serving builds; it stops if not.
 If it stops because TRL cannot mask assistant tokens for this template, set
 `sft.assistant_only_loss: false` (both backends then use full-sequence loss) and say so in the report.
-`--dry-run` prints the per-seed commands. If AlignTune fails outright, pass `--aligntune-seeds` with no
+`run_eval` records each seed's backend (from the adapter's `dhanground.json`) and the summary
+table has a "backend by seed" row, so the report shows the AlignTune/TRL split. `--dry-run` prints the per-seed commands. If AlignTune fails outright, pass `--aligntune-seeds` with no
 value to train every seed with `--backend trl`.
 
 If HF credits run out mid-run, resume on Kaggle from the last Hub checkpoint (saved every 200 steps):

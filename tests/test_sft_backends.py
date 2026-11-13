@@ -66,3 +66,48 @@ def test_dpo_resume_reloads_policy_adapter(tmp_path):
     restore_policy(model, tmp_path / "checkpoint-400")
     assert calls == [("load", (str(tmp_path / "checkpoint-400"),), {"adapter_name": "default", "is_trainable": True}),
                      ("set", "default")]
+
+
+# --- seed provenance in eval results; shared loss and batch settings ---
+
+import sys
+
+import pytest
+import yaml
+
+from adapters.aligntune_sft import grad_accum
+from evals import summarize
+from evals.run_eval import adapter_provenance
+
+
+def test_adapter_provenance_local_hub_and_base(monkeypatch, tmp_path):
+    (tmp_path / "dhanground.json").write_text(json.dumps({"backend": "aligntune", "name": "A2-s0-abc"}))
+    assert adapter_provenance("A2", str(tmp_path)) == {"backend": "aligntune", "adapter_name": "A2-s0-abc"}
+    assert adapter_provenance("A0", None) == {"backend": "base", "adapter_name": None}
+
+    hub_file = tmp_path / "hub.json"
+    hub_file.write_text(json.dumps({"backend": "trl", "name": "A2-s1-abc"}))
+    monkeypatch.setitem(sys.modules, "huggingface_hub",
+                        types.SimpleNamespace(hf_hub_download=lambda repo, f: str(hub_file)))
+    assert adapter_provenance("A2", "org/dhanground-A2-s1-abc") == {"backend": "trl", "adapter_name": "A2-s1-abc"}
+
+    def missing(repo, f):
+        raise OSError("404")
+
+    monkeypatch.setitem(sys.modules, "huggingface_hub", types.SimpleNamespace(hf_hub_download=missing))
+    assert adapter_provenance("A2", "org/nope")["backend"] == "unknown"
+
+
+def test_summary_reports_backend_per_seed(monkeypatch, tmp_path):
+    monkeypatch.setattr(summarize, "RESULTS", tmp_path)
+    for seed, backend in [(0, "aligntune"), (1, "trl")]:
+        (tmp_path / f"A2_s{seed}_test.json").write_text(json.dumps({"backend": backend}))
+    assert summarize.seed_backends("A2", [0, 1, 2], "test") == {"0": "aligntune", "1": "trl", "2": "unknown"}
+
+
+def test_lora_yaml_settings_valid_for_both_backends():
+    sft = yaml.safe_load(open("configs/lora.yaml", encoding="utf-8"))["sft"]
+    assert sft["loss_type"] in {"nll", "dft"}  # AlignTune 0.1.33 rejects anything else
+    assert grad_accum(sft) * sft["per_device_batch_size"] == sft["effective_batch_size"]
+    with pytest.raises(SystemExit):
+        grad_accum({"effective_batch_size": 16, "per_device_batch_size": 3})

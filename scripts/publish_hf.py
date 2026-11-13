@@ -10,8 +10,9 @@ Three dataset repos, each with a generated dataset card (README.md):
   <org>/dhanground-hinglish-qa  data/curated/{train,dev,test}.jsonl, gate_log.jsonl, the frozen test set and its
                                 sha256, evals/test_set_card.md, evals/results/* under results/
   <org>/dhanground-dpo-pairs    data/arms/A3_pairs.jsonl
-and a collection "DhanGround" with the three datasets plus every model repo <org>/dhanground-* (the adapters
-that adapters.aligntune_sft / aligntune_dpo pushed).
+and two collections under <org>: "DhanGround datasets" (the three datasets; the gate log, frozen test set and
+eval results live in dhanground-hinglish-qa) and "DhanGround models" (the base model from configs/arms.yaml plus
+every model repo <org>/dhanground-*, i.e. the adapters that adapters.aligntune_sft / aligntune_dpo pushed).
 
 The script refuses (exit 2, nothing uploaded) if any input is missing, if data/test/test.jsonl does not match
 data/test/test.sha256, or if evals/test_set_card.md is still the placeholder.
@@ -30,8 +31,11 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-COLLECTION_TITLE = "DhanGround"
-COLLECTION_DESCRIPTION = "Tiny Aya Fire answering Indian banking questions only from RBI passages: data, results, adapters."
+# The submission needs two public collections: models (base + adapters) and datasets (data, logs, results).
+MODEL_COLLECTION = ("DhanGround models",
+                    "Tiny Aya Fire base model and DhanGround LoRA adapters (arms A1, A2, A3) for RBI-grounded banking QA.")
+DATASET_COLLECTION = ("DhanGround datasets",
+                      "RBI corpus, Hinglish banking QA with gate log, frozen test set, eval results, DPO pairs.")
 PLACEHOLDER_MARK = "<!-- placeholder: run python -m evals.make_test_card -->"  # same as evals/make_test_card.py
 
 LICENCE = """\
@@ -71,7 +75,7 @@ FIELD_DOCS = {
     "attack_type": "adversarial rows only: the attack (e.g. `injection`, `out_of_corpus`)",
     # gate log
     "gate": "curation gate name",
-    "decision": "`pass`, `fail` or `n/a`",
+    "decision": "`pass` or `fail`",
     "reason": "why the gate decided so",
     "score": "gate score, if the gate has one",
     # DPO pairs
@@ -142,7 +146,7 @@ def check_inputs(root: Path) -> list[str]:
     required = [
         "corpus/state.json", "data/curated/train.jsonl", "data/curated/dev.jsonl", "data/curated/test.jsonl",
         "data/curated/gate_log.jsonl", "data/test/test.jsonl", "data/test/test.sha256",
-        "data/arms/A3_pairs.jsonl", "evals/test_set_card.md",
+        "data/arms/A3_pairs.jsonl", "evals/test_set_card.md", "configs/arms.yaml",
     ]
     problems += [f"missing {p}" for p in required if not (root / p).is_file()]
     if not list((root / "corpus").glob("*.jsonl")):
@@ -191,8 +195,9 @@ def build_repos(root: Path) -> list[DatasetRepo]:
         "with retrieved RBI passages and a cited answer, or an abstain label when the passages do not answer it. "
         "Includes the curation log, the frozen test set and the evaluation results.",
         ["Generate: a teacher LLM wrote questions from corpus paragraphs (`intelligence/generate.py`).",
-         "Curate: deterministic gates plus CuratorKIT dedup, grounding and reward gates (`pipeline/curate.py`); "
-         "`gate_log.jsonl` has one decision per row and gate.",
+         "Curate: deterministic gates and CuratorKIT dedup on every row; CuratorKIT grounding and reward gates on "
+         "answerable rows only when a judge model was set (`pipeline/curate.py`; `provenance.gates.halluc` is "
+         "`pass` or `n/a` per row). `gate_log.jsonl` has one decision per row and gate.",
          "Test: hand-checked, sampled and frozen with hand-written adversarial rows "
          "(`pipeline/build_arms.py freeze`); see `test_set_card.md`. `frozen_test/test.sha256` pins the file; "
          "the evaluator refuses a mismatch and scores each (arm, seed) on test once.",
@@ -276,12 +281,27 @@ def print_plan(repos: list[DatasetRepo], org: str, public: bool, root: Path) -> 
             rows = f"{i.rows} rows" if i.rows is not None else "-"
             print(f"  {i.path_in_repo:<40} {rows:>12} {human(i.size):>10}")
     adapters = local_adapter_repos(root, org)
-    print(f'collection "{COLLECTION_TITLE}" ({vis}) under {org}: the {len(repos)} datasets + model repos '
+    print(f'collection "{DATASET_COLLECTION[0]}" ({vis}) under {org}: the {len(repos)} datasets')
+    print(f'collection "{MODEL_COLLECTION[0]}" ({vis}) under {org}: base model {base_model(root)} + model repos '
           f"{org}/dhanground-* found on the Hub at push time")
     print("  adapters expected from local checkpoints/: " + (", ".join(adapters) if adapters else "(none local)"))
 
 
-def push(repos: list[DatasetRepo], org: str, public: bool) -> str:
+def base_model(root: Path) -> str:
+    import yaml
+
+    return yaml.safe_load((root / "configs/arms.yaml").read_text(encoding="utf-8"))["base_model"]
+
+
+def collection(api, title_desc: tuple[str, str], org: str, public: bool):
+    title, description = title_desc
+    coll = api.create_collection(title, namespace=org, description=description, private=not public, exists_ok=True)
+    if public:  # an existing collection keeps its old visibility
+        api.update_collection_metadata(coll.slug, private=False)
+    return coll
+
+
+def push(repos: list[DatasetRepo], org: str, public: bool, base: str) -> tuple[str, str]:
     from huggingface_hub import HfApi
 
     api = HfApi()
@@ -297,24 +317,30 @@ def push(repos: list[DatasetRepo], org: str, public: bool) -> str:
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(i.local, dest)
             (stage / "README.md").write_text(r.card, encoding="utf-8")
+            # delete_patterns="*" drops files from an earlier publish that this one no longer has, so the repo
+            # matches the card's Files table (upload_folder keeps .gitattributes and the files being uploaded)
             api.upload_folder(repo_id=repo_id, folder_path=str(stage), repo_type="dataset",
-                              commit_message="Publish DhanGround data")
+                              commit_message="Publish DhanGround data", delete_patterns="*")
         print(f"pushed {repo_id}")
 
-    collection = api.create_collection(COLLECTION_TITLE, namespace=org, description=COLLECTION_DESCRIPTION,
-                                       private=not public, exists_ok=True)
-    if public:  # an existing collection keeps its old visibility
-        api.update_collection_metadata(collection.slug, private=False)
+    datasets = collection(api, DATASET_COLLECTION, org, public)
     for r in repos:
-        api.add_collection_item(collection.slug, r.repo_id(org), "dataset", exists_ok=True)
+        api.add_collection_item(datasets.slug, r.repo_id(org), "dataset", exists_ok=True)
+    print(f"collection {datasets.slug}: {len(repos)} datasets")
+
+    models = collection(api, MODEL_COLLECTION, org, public)
+    api.add_collection_item(models.slug, base, "model", note="Base model (gated; non-commercial licence)",
+                            exists_ok=True)
     prefix = f"{org}/dhanground-"
     adapters = sorted(m.id for m in api.list_models(author=org, search="dhanground-") if m.id.startswith(prefix))
     for repo_id in adapters:
         if public:
             api.update_repo_settings(repo_id, repo_type="model", private=False)
-        api.add_collection_item(collection.slug, repo_id, "model", exists_ok=True)
-    print(f"collection {collection.slug}: {len(repos)} datasets, {len(adapters)} adapters")
-    return collection.slug
+        api.add_collection_item(models.slug, repo_id, "model", exists_ok=True)
+    print(f"collection {models.slug}: base model + {len(adapters)} adapters")
+    if not adapters:
+        print("WARNING: no <org>/dhanground-* adapter repos on the Hub; train with --hub-org to push them")
+    return datasets.slug, models.slug
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -339,7 +365,7 @@ def main(argv: list[str] | None = None) -> int:
     if not a.push:
         print("dry run: nothing uploaded (add --push)")
         return 0
-    push(repos, a.org, a.public)
+    push(repos, a.org, a.public, base_model(a.root))
     return 0
 
 

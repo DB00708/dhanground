@@ -45,6 +45,9 @@ def build_card(test: Path, review: Path, corpus: Path) -> str:
     topic = Counter(topics.get(r.get("provenance", {}).get("source_doc", ""), r.get("attack_type") or "other")
                     for r in rows)
     attacks = Counter(r.get("attack_type") or "(none)" for r in rows if r.get("kind") == "adversarial")
+    answerable = kinds.get("answerable", 0)
+    judged = sum(1 for r in rows if r.get("kind") == "answerable"
+                 and r.get("provenance", {}).get("gates", {}).get("halluc") == "pass")
     keep = review_counts(review)
     reviewed = keep.get("y", 0) + keep.get("n", 0)
 
@@ -76,7 +79,9 @@ def build_card(test: Path, review: Path, corpus: Path) -> str:
         "",
         "1. Generate. A teacher model wrote questions from RBI passages. The passages come only from",
         "   documents in the test split. The split is by document, so no test document is in train or dev.",
-        "2. Curate. Each row passed our gates and the CuratorKIT gates (dedup, grounding, reward).",
+        "2. Curate. Every generated row passed our deterministic gates and CuratorKIT dedup. The CuratorKIT",
+        "   grounding and reward gates ran on answerable rows only when a judge model was set:",
+        f"   {judged} of {answerable} answerable rows passed them (`provenance.gates.halluc` = pass).",
         "   `gate_log.jsonl` in the dataset repo records each decision.",
         "3. Hand-check. A person read each candidate row with its source passage and marked keep=y or keep=n.",
         "4. Sample. With seed 0, the freeze step took up to 300 answerable and 100 unanswerable kept rows.",

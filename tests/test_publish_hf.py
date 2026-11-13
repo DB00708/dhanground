@@ -20,10 +20,10 @@ def write_jsonl(path: Path, rows: list[dict]) -> None:
     path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
 
 
-def qa_row(i, kind="answerable", lang="hi-Latn", doc="rbi-1", **extra):
+def qa_row(i, kind="answerable", lang="hi-Latn", doc="rbi-1", halluc="n/a", **extra):
+    prov = {"source_doc": doc, "span_sha256": "x", "generator": "t", "gates": {"halluc": halluc}}
     return {"row_id": f"dg-{i}", "lang": lang, "question": f"q{i}", "passages": [], "answerable": kind == "answerable",
-            "answer": "a", "cited_pids": [], "provenance": {"source_doc": doc, "span_sha256": "x", "generator": "t"},
-            "split": "test", "kind": kind, **extra}
+            "answer": "a", "cited_pids": [], "provenance": prov, "split": "test", "kind": kind, **extra}
 
 
 @pytest.fixture
@@ -36,7 +36,9 @@ def repo(tmp_path):
         write_jsonl(root / f"data/curated/{s}.jsonl", [qa_row(1), qa_row(2)])
     write_jsonl(root / "data/curated/gate_log.jsonl", [{"row_id": "dg-1", "split": "train", "gate": "dedup",
                                                         "decision": "pass", "reason": "", "score": None}])
-    test = [qa_row(1), qa_row(2, kind="unanswerable", lang="en", doc="faq-2"),
+    (root / "configs").mkdir()
+    (root / "configs/arms.yaml").write_text("base_model: CohereLabs/tiny-aya-fire\n")
+    test = [qa_row(1, halluc="pass"), qa_row(2, kind="unanswerable", lang="en", doc="faq-2"),
             qa_row(3, kind="adversarial", lang="hi-Deva", doc="", attack_type="injection")]
     write_jsonl(root / "data/test/test.jsonl", test)
     digest = hashlib.sha256((root / "data/test/test.jsonl").read_bytes()).hexdigest()
@@ -64,7 +66,8 @@ class FakeHub:
         hub = self
 
         class Collection:
-            slug = "org/dhanground-64f9a55bb3115b4f513ec026"
+            def __init__(self, title):
+                self.slug = "org/" + title.lower().replace(" ", "-") + "-64f9a55bb3115b4f513ec026"
 
         class HfApi:
             def __init__(self, endpoint=None, token=None, library_name=None, library_version=None,
@@ -88,13 +91,13 @@ class FakeHub:
                 files = {p.relative_to(folder_path).as_posix(): p.read_text(encoding="utf-8")
                          for p in Path(folder_path).rglob("*") if p.is_file()}
                 hub.uploads[repo_id] = files
-                hub.calls.append(("upload_folder", repo_id, repo_type))
+                hub.calls.append(("upload_folder", repo_id, repo_type, delete_patterns))
 
             def create_collection(self, title, *, namespace=None, description=None, private=False,
                                   resource_group_id=None, exists_ok=False, token=None):
                 assert description is None or len(description) <= 150  # Hub limit per the docstring
                 hub.calls.append(("create_collection", title, namespace, private, exists_ok))
-                return Collection()
+                return Collection(title)
 
             def update_collection_metadata(self, collection_slug, *, title=None, description=None, position=None,
                                            private=None, theme=None, token=None):
@@ -103,7 +106,7 @@ class FakeHub:
             def add_collection_item(self, collection_slug, item_id, item_type, *, note=None, exists_ok=False,
                                     token=None):
                 assert item_type in ("model", "dataset", "space", "paper", "collection", "bucket")
-                hub.calls.append(("add_collection_item", item_id, item_type, exists_ok))
+                hub.calls.append(("add_collection_item", collection_slug, item_id, item_type, exists_ok))
 
             def list_models(self, *, filter=None, author=None, search=None, limit=None, **kwargs):
                 hub.calls.append(("list_models", author, search))
@@ -129,6 +132,8 @@ def test_dry_run_prints_plan_and_uploads_nothing(repo, hub, capsys):
     assert "corpus/faq-2.jsonl" in out and "2 rows" in out
     assert "frozen_test/test.sha256" in out and "results/A2_s0_test.json" in out
     assert "org/dhanground-A3-s0-abc1234" in out and "org/dhanground-A1-s1-abc1234" in out
+    assert 'collection "DhanGround datasets"' in out and 'collection "DhanGround models"' in out
+    assert "CohereLabs/tiny-aya-fire" in out
     assert "dry run" in out
     assert hub.calls == []
 
@@ -140,6 +145,7 @@ def test_dry_run_prints_plan_and_uploads_nothing(repo, hub, capsys):
     (lambda r: (r / "data/test/test.jsonl").write_text("{}\n"), "does not match test.sha256"),
     (lambda r: (r / "evals/test_set_card.md").write_text(make_test_card.PLACEHOLDER_MARK), "placeholder"),
     (lambda r: (r / "data/curated/dev.jsonl").write_text(""), "data/curated/dev.jsonl is empty"),
+    (lambda r: (r / "configs/arms.yaml").unlink(), "missing configs/arms.yaml"),
 ])
 def test_refuses_bad_inputs_even_with_push(repo, hub, capsys, breaker, message):
     breaker(repo)
@@ -172,12 +178,16 @@ def test_push_private_uploads_datasets_cards_and_collection(repo, hub):
                        "results/A2_s0_test.json", "results/summary_test.md"}
     assert qa["frozen_test/test.jsonl"] == (repo / "data/test/test.jsonl").read_text(encoding="utf-8")
     assert set(hub.uploads["org/dhanground-dpo-pairs"]) == {"README.md", "data/A3_pairs.jsonl"}
+    # a re-run removes files an earlier publish left behind
+    assert all(c[3] == "*" for c in hub.calls if c[0] == "upload_folder")
 
-    assert ("create_collection", "DhanGround", "org", True, True) in hub.calls
-    items = [(c[1], c[2]) for c in hub.calls if c[0] == "add_collection_item"]
-    assert items == [("org/dhanground-rbi-corpus", "dataset"), ("org/dhanground-hinglish-qa", "dataset"),
-                     ("org/dhanground-dpo-pairs", "dataset"),
-                     ("org/dhanground-A2-s0-abc1234", "model"), ("org/dhanground-A3-s0-abc1234", "model")]
+    assert ("create_collection", "DhanGround datasets", "org", True, True) in hub.calls
+    assert ("create_collection", "DhanGround models", "org", True, True) in hub.calls
+    items = [(c[1].split("-64f9")[0], c[2], c[3]) for c in hub.calls if c[0] == "add_collection_item"]
+    ds, ms = "org/dhanground-datasets", "org/dhanground-models"
+    assert items == [(ds, "org/dhanground-rbi-corpus", "dataset"), (ds, "org/dhanground-hinglish-qa", "dataset"),
+                     (ds, "org/dhanground-dpo-pairs", "dataset"), (ms, "CohereLabs/tiny-aya-fire", "model"),
+                     (ms, "org/dhanground-A2-s0-abc1234", "model"), (ms, "org/dhanground-A3-s0-abc1234", "model")]
 
 
 def test_push_public_flips_existing_repos_and_collection(repo, hub):
@@ -187,8 +197,12 @@ def test_push_public_flips_existing_repos_and_collection(repo, hub):
     assert flipped == {("org/dhanground-rbi-corpus", "dataset"), ("org/dhanground-hinglish-qa", "dataset"),
                        ("org/dhanground-dpo-pairs", "dataset"), ("org/dhanground-A2-s0-abc1234", "model"),
                        ("org/dhanground-A3-s0-abc1234", "model")}
-    assert ("create_collection", "DhanGround", "org", False, True) in hub.calls
-    assert any(c[0] == "update_collection_metadata" and c[2] is False for c in hub.calls)
+    assert ("create_collection", "DhanGround datasets", "org", False, True) in hub.calls
+    assert ("create_collection", "DhanGround models", "org", False, True) in hub.calls
+    made_public = {c[1].split("-64f9")[0] for c in hub.calls if c[0] == "update_collection_metadata" and c[2] is False}
+    assert made_public == {"org/dhanground-datasets", "org/dhanground-models"}
+    # the base model belongs to someone else: never touch its settings
+    assert not any(c[0] == "update_repo_settings" and c[1] == "CohereLabs/tiny-aya-fire" for c in hub.calls)
 
 
 def test_dataset_cards_have_fields_provenance_licence_and_snapshot(repo, hub):
@@ -202,6 +216,7 @@ def test_dataset_cards_have_fields_provenance_licence_and_snapshot(repo, hub):
         assert "non-commercial" in card and "rbi.org.in" in card
     qa = hub.uploads["org/dhanground-hinglish-qa"]["README.md"]
     assert "- `answerable`:" in qa and "- `gate`:" in qa and "| `data/train.jsonl` | 2 |" in qa
+    assert "grounding and reward gates on answerable rows only when a judge model was set" in qa
     assert "- `reject_reason`:" in hub.uploads["org/dhanground-dpo-pairs"]["README.md"]
 
 
@@ -214,6 +229,7 @@ def test_test_card_counts_and_hash(repo):
     assert "| hi-Deva | 1 | 33% |" in card and "| en | 1 | 33% |" in card
     assert "| upi | 1 | 33% |" in card and "| atm | 1 | 33% |" in card and "| injection | 1 | 33% |" in card
     assert "They kept 2 rows (keep=y) and removed 1 rows (keep=n)." in card
+    assert "1 of 1 answerable rows passed them" in card
     assert make_test_card.PLACEHOLDER_MARK not in card
 
 

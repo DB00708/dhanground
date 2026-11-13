@@ -91,12 +91,13 @@ or `data/test/test.jsonl` does not match `test.sha256`. Then push (private), che
 
 ```bash
 python scripts/publish_hf.py --org <org>
+python scripts/publish_hf.py --org <org> --push
 python scripts/publish_hf.py --org <org> --push --public
 ```
 
 This creates the datasets `dhanground-rbi-corpus`, `dhanground-hinglish-qa` (curated splits, gate log, frozen
-test set, results) and `dhanground-dpo-pairs`, each with a dataset card, and a "DhanGround" collection that also
-holds every `<org>/dhanground-*` adapter repo. Report toolkit bugs in `docs/upstream_issues.md`.
+test set, results) and `dhanground-dpo-pairs`, each with a dataset card, and two collections: "DhanGround datasets"
+(the three datasets) and "DhanGround models" (the base model and every `<org>/dhanground-*` adapter repo). Report toolkit bugs in `docs/upstream_issues.md`.
 
 ## Contracts
 

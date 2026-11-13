@@ -72,6 +72,8 @@ Review and integration results are logged in tests/e2e/INTEGRATION_LOG.md on the
 | 2026-11-12 | T2 | Reviewer APPROVED | claude/serve-demo-d875aa @ 29561c5 | 3,000 simulated runs vs the server rate limiter: 0 × 429; 107 tests; 2 optional nits |
 | 2026-11-12 | T1 | Reviewer APPROVED | claude/serve-demo-d875aa @ 93540fa | 2 rounds; fixed short Tamil answers with citations being read as English; T2 approval still valid (later commit touches only core/lang.py + tests) → sent to integration |
 | 2026-11-12 | T3 | Reviewer APPROVED | claude/data-gen-0f329e @ 2d44de9 | 1 should-fix (review.csv showed only the first passage) + 2 nits fixed; decision: typo and two-passage questions also in dev/test, reported as their own slice |
+| 2026-11-13 | T1+T2 | MERGED to main | main @ ea25de3 | with the e2e harness (498297d); 109 unit tests; native e2e 9/9 PASS in 82 s incl. warm-up across 4 arms; pushed to https://github.com/DB00708/dhanground (public) |
+| 2026-11-13 | T7 | Reviewer CHANGES REQUESTED | claude/train-resume-d748e9 @ d73a895 | no blockers; 1 should-fix: a failed Hub upload kills the checkpoint-sync thread and can block the A3 final save; download layout, latest-checkpoint pick, trl 1.7.1 DPO changes, DPO restore and "AlignTune can't resume" all verified against library source; A3 resume untested on GPU |
 | 2026-11-12 | T5 | Reviewer APPROVED | claude/eval-set-cc3068 @ c427d83 | tau tuning only; 3 optional nits, no blockers |
 
 ## Edge-case catalog (design: 20 cases)

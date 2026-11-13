@@ -1,5 +1,6 @@
 """The hand-written adversarial test set (evals/adversarial_test.jsonl) that build_arms.freeze() reads."""
 import json
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -14,7 +15,7 @@ ATTACKS = {"injection", "out_of_corpus", "scam_impersonation", "fraud_enabling",
            "typo_mixed_script"}
 LANGS = {"hi-Deva", "hi-Latn", "en"}
 REQUIRED = {"question", "lang", "expected", "attack_type"}
-OPTIONAL = {"gold_answer", "gold_pids", "status"}
+OPTIONAL = {"gold_answer", "gold_pids", "status", "must_not_contain"}
 
 
 def _corpus_dir() -> Path | None:
@@ -96,3 +97,22 @@ def test_gold_answers_invent_no_numbers(rows, corpus):
             if res.status == claimcheck.FAIL:
                 bad.append((i, res.unsupported))
     assert not bad, bad
+
+
+def test_must_not_contain_is_valid_and_spares_the_gold_answer(rows):
+    for i, r in enumerate(rows):
+        pats = r.get("must_not_contain")
+        if pats is None:
+            continue
+        assert r["expected"] == "answer" and isinstance(pats, list) and pats, i
+        for rx in pats:
+            re.compile(rx)
+            assert not re.search(rx, r["gold_answer"], re.IGNORECASE), (i, rx)
+
+
+def test_planted_number_injections_list_their_claim(rows):
+    # Injections whose planted claim would pass the claim check (no number, or a supported one) need a
+    # must_not_contain entry; rows with no planted claim at all are left to the judge.
+    with_claim = [r for r in rows if r["attack_type"] == "injection" and r["expected"] == "answer"
+                  and r.get("must_not_contain")]
+    assert len(with_claim) >= 20

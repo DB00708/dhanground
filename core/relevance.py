@@ -9,7 +9,8 @@ from __future__ import annotations
 import re
 
 _HEADING_RE = re.compile(r"Chapter\s+([IVXL]+)\s*(A)?\s*[-–:]\s*(?!\s)")
-_REFERENCE_RE = re.compile(r"^[^.]{0,80}?\bof (?:these|the)\b")
+# "Chapter XI – Acquisition Finance of these Directions" is a cross-reference; "Chapter II - Role of the Board" is a heading.
+_REFERENCE_RE = re.compile(r"^[^.]{0,80}?\bof (?:these|the) Directions\b")
 
 
 def chapter_headings(text: str) -> list[str]:
@@ -62,29 +63,49 @@ def excluded_term(text: str, terms: list[str]) -> str | None:
     return next((t for t in terms if t.lower() in low), None)
 
 
-def span_pids(passages: list[dict], start: str, end: str) -> set[str]:
+def span_pids(passages: list[dict], start: str, end: str | None) -> set[str]:
     """pids from the passage containing `start` up to (not including) the one containing `end`, case-insensitive.
 
-    Skips contents pages, which also contain the heading text.
+    `end` None runs to the end of the document. Skips contents pages, which also contain the heading text.
+    Returns an empty set if `start` is not found; raises ValueError if `end` is given but never found after it,
+    so a typo in `end` cannot silently swallow the rest of the document.
     """
     inside, out = False, set()
     for p in sorted(passages, key=lambda p: int(p["para_id"].lstrip("p"))):
         low = p["text"].lower()
         if _TOC_RE.search(p["text"]):
             continue
-        if inside and end.lower() in low:
-            break
+        if inside and end is not None and end.lower() in low:
+            return out
         if start.lower() in low:
             inside = True
         if inside:
             out.add(p["pid"])
+    if inside and end is not None:
+        raise ValueError(f"span end not found after {start!r}: {end!r}")
+    return out
+
+
+def _spans(passages: list[dict], doc_id: str, spans: list[dict], kind: str) -> set[str]:
+    out = set()
+    for span in spans:
+        found = span_pids(passages, span["from"], span.get("to"))
+        if not found:
+            raise ValueError(f"{kind} span not found in {doc_id}: {span['from']!r}")
+        out |= found
     return out
 
 
 def consumer_passages(passages: list[dict], exclude_chapters: dict[str, list[str]],
                       exclude_terms: list[str], keep_spans: dict[str, list[dict]] | None = None,
+                      exclude_spans: dict[str, list[dict]] | None = None,
                       ) -> tuple[list[dict], dict[str, int]]:
-    """Returns (kept passages, drop counts by reason). keep_spans ({doc: [{from, to}]}) overrides chapter exclusion."""
+    """Returns (kept passages, drop counts by reason).
+
+    keep_spans ({doc: [{from, to}]}) overrides chapter exclusion. exclude_spans (same shape) drops sections
+    inside a kept chapter, or in a document without chapter headings; it wins over keep_spans. A span `to`
+    of None runs to the end of the document. A span whose `from` text is not found raises ValueError.
+    """
     by_doc: dict[str, list[dict]] = {}
     for p in passages:
         by_doc.setdefault(p["doc_id"], []).append(p)
@@ -92,16 +113,14 @@ def consumer_passages(passages: list[dict], exclude_chapters: dict[str, list[str
     for doc_id, ps in by_doc.items():
         skip = set(exclude_chapters.get(doc_id, [])) | {TOC}
         chapters = assign_chapters(ps)
-        keep = set()
-        for span in (keep_spans or {}).get(doc_id, []):
-            found = span_pids(ps, span["from"], span["to"])
-            if not found:
-                raise ValueError(f"keep span not found in {doc_id}: {span['from']!r}")
-            keep |= found
+        keep = _spans(ps, doc_id, (keep_spans or {}).get(doc_id, []), "keep")
+        drop = _spans(ps, doc_id, (exclude_spans or {}).get(doc_id, []), "exclude")
         for p in ps:
             reason = None
             if chapters.get(p["pid"]) == TOC:
                 reason = "contents page"
+            elif p["pid"] in drop:
+                reason = f"{doc_id}:span"
             elif chapters.get(p["pid"]) in skip and p["pid"] not in keep:
                 reason = f"{doc_id}:chapter {chapters[p['pid']]}"
             elif term := excluded_term(p["text"], exclude_terms):

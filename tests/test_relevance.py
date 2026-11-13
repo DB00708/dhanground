@@ -52,3 +52,60 @@ def test_other_documents_untouched():
     other = doc("UPI: auto reversal latest on T + 1 day.", doc_id="faq-1")
     kept, dropped = consumer_passages(DOC + other, {"md-x": ["XV"]}, [])
     assert "faq-1-p1" in {p["pid"] for p in kept}
+
+
+def test_heading_with_of_the_in_title_is_not_a_reference():
+    assert chapter_headings("e may be. Chapter II - Role of the Board A. Board Approved Policies 7.") == ["II"]
+    assert chapter_headings("see Chapter XI – Acquisition Finance of these Directions.") == []
+
+
+def test_exclude_spans_drop_sections_and_open_ended_span_runs_to_end():
+    flat = doc("1. Definitions. A PPI is a prepaid instrument.", "3. Eligibility for issuers. Net worth.",
+               "4. Capital.", "6. Safeguards. KYC applies to holders.", "18. Information system audit.",
+               "Annex escrow report format.", doc_id="md-y")
+    kept, dropped = consumer_passages(flat, {}, [], None, {"md-y": [
+        {"from": "3. Eligibility", "to": "6. Safeguards"}, {"from": "18. Information system audit", "to": None}]})
+    assert {p["pid"] for p in kept} == {"md-y-p1", "md-y-p4"}
+    assert dropped == {"md-y:span": 4}
+
+
+def test_exclude_span_wins_over_keep_span_and_missing_one_fails():
+    kept, _ = consumer_passages(
+        DOC, {"md-x": ["VIII"]}, [],
+        {"md-x": [{"from": "B. Housing Finance", "to": "C. Loans and advances"}]},
+        {"md-x": [{"from": "B. Housing Finance", "to": "C. Loans and advances"}]})
+    assert "md-x-p5" not in {p["pid"] for p in kept}
+    with pytest.raises(ValueError):
+        consumer_passages(DOC, {}, [], None, {"md-x": [{"from": "No Such Heading", "to": None}]})
+
+
+def test_configured_spans_resolve_on_the_real_index():
+    """Every span in configs/generation.yaml must match text in the built index.
+
+    Uses ./index, or the index directory in DHANGROUND_INDEX_DIR; skipped where neither exists.
+    """
+    import json
+    import os
+    from pathlib import Path
+
+    import yaml
+    from core.relevance import span_pids
+
+    repo = Path(__file__).resolve().parents[1]
+    env = os.environ.get("DHANGROUND_INDEX_DIR")
+    found = [Path(env) / "passages.jsonl"] if env else sorted((repo / "index").glob("*/passages.jsonl"))
+    if not found or not found[-1].exists():
+        pytest.skip("no built index in this checkout")
+    cfg = yaml.safe_load((repo / "configs" / "generation.yaml").read_text(encoding="utf-8"))
+    passages = [json.loads(l) for l in found[-1].open(encoding="utf-8")]
+    for kind in ("keep_spans", "exclude_spans"):
+        for doc_id, spans in (cfg.get(kind) or {}).items():
+            ps = [p for p in passages if p["doc_id"] == doc_id]
+            for span in spans:
+                assert span_pids(ps, span["from"], span.get("to")), (kind, doc_id, span["from"])
+
+
+def test_span_end_typo_fails_instead_of_running_to_document_end():
+    with pytest.raises(ValueError):
+        consumer_passages(DOC, {"md-x": ["VIII"]}, [],
+                          {"md-x": [{"from": "B. Housing Finance", "to": "C. Loans TYPO"}]})

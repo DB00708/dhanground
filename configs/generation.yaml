@@ -9,6 +9,8 @@ languages:          # share of rows per language
   en: 0.3
 unanswerable_rate: 0.2
 adversarial_rate: 0.05    # answerable questions with an injected instruction; gold answer stays grounded
+typo_rate: 0.1            # hi-Latn questions given phone-typing noise (wapas->wpas, nahi->nhi); answer unchanged
+multi_passage_rate: 0.1   # answerable jobs that pair a paragraph with the next one; the answer cites both
 questions_per_call: 2
 # Generate questions only from retail-customer content (retrieval still indexes everything).
 # Chapters are tagged by core/relevance.py; contents pages are always skipped.
@@ -16,9 +18,49 @@ exclude_chapters:
   md-13156:   # Credit Facilities: keep I definitions, III digital lending, IV gold/silver loans,
               # VI microfinance, XIII loans against financial assets, XVII miscellaneous
     [II, IIA, VA, VII, VIII, IX, X, XI, XII, XIIIA, XIV, XV, XVI, XVIII]
+  md-13141:   # KYC: keep I definitions, III acceptance policy, IV risk category (not revealed to customer), V, VI; X via keep_spans
+    [II, VII, VIII, IX, X, XI]   # board/policy, records, FIU reporting, sanctions lists, repeal + UAPA orders
+  md-13155: [VIII]          # Cards: repeal (keep_spans keeps the KFS table that shares its first passage)
+  md-13157: [VII]           # Interest on Deposits: repeal
+  md-13642: [II, III, VII]  # Digital Payment Security: board, bank IT controls (keep_spans: authentication, fraud, customer protection), repeal
 keep_spans:   # sections inside an excluded chapter that customers do ask about (by heading text)
   md-13156:
     - {from: "B. Housing Finance", to: "C. Loans and advances to Commercial Real Estate"}   # home loans: LTV, quantum, disbursal
+  md-13141:
+    - {from: "Chapter X – Other Instructions", to: "64. Compliance with the provisions of Foreign Contribution"}  # secrecy of customer data
+    - {from: "65. CDD Procedure and sharing KYC information", to: "Under FATCA and CRS"}   # CKYC identifier, re-KYC via CKYCR
+    - {from: "67. Period for presenting payment instruments", to: "72. Introduction of New Technologies"}   # cheque validity, money mules, UCIC
+    - {from: "74. Wire Transfer", to: "(2) Responsibilities of ordering bank"}   # originator details on transfers of ₹50,000+
+    - {from: "75. Issue and Payment of Demand Drafts", to: "78. At-par cheque facility"}   # DD over ₹50,000, quoting PAN, third-party products
+  md-13155:
+    - {from: "At application - Key fact statement", to: "Repeal and saving 93"}
+  md-13642:
+    - {from: "D. Authentication Framework", to: "F. Reconciliation Mechanism"}   # 2FA / AFA, fraud monitoring
+    - {from: "G. Customer Protection, Awareness and Grievance Redressal Mechanism", to: "Chapter IV - Internet Banking Security Controls"}
+exclude_spans:   # sections inside a kept chapter, or in documents without chapter headings, that are bank-internal (to: null = end)
+  md-13141:
+    - {from: "46. Client accounts opened by professional intermediaries", to: "47. Simplified norms for Self Help Groups"}
+    - {from: "49. Simplified KYC norms for Foreign Portfolio Investors", to: "Chapter VII – Record Management"}
+  md-13140:   # Responsible Business Conduct: chapters I, III-IX are customer-facing
+    - {from: "Chapter II – Institutional Framework", to: "B.2.1 Deposit Policy"}   # board policy lists and reviews
+    - {from: "B.4 Customer Service Committee of the Board", to: "Chapter III – Customer Service in Branches"}   # board / branch committees
+    - {from: "J.1.2 Working Group to review export credit", to: "K. Recovery Agents engaged by Banks"}   # exporters, not retail
+    - {from: "With the issue of these Directions, the existing Directions", to: "We have separately displayed the key interest rates"}   # repeal; annexes (notice board, claim forms, KFS) kept
+  md-12156:   # PPIs (no chapter headings)
+    - {from: "3. Eligibility requirements for issuance of PPIs by banks", to: "6. Safeguards against money laundering"}   # issuer eligibility, capital, authorisation
+    - {from: "12. Deployment of money collected", to: "13. Validity and redemption"}   # escrow investment
+    - {from: "18. Information system audit", to: null}   # IS audit, reporting, repeal list, annex formats
+  md-13271:   # Internal Ombudsman (no chapter headings parsed): keep definitions and complaint handling
+    - {from: "Appointment of Internal Ombudsman (1)", to: "Role and Responsibilities 12."}   # IO appointment, tenure, staffing, audit
+    - {from: "13. Board Oversight", to: "All complaints that are partially resolved or wholly rejected"}
+    - {from: "16. Reporting to Reserve Bank", to: null}   # reporting to RBI, repeal, quarterly report annexure
+  ios-2026:
+    - {from: "7. Staffing of the Offices of the RBI Ombudsman", to: "Powers and Functions (1)"}
+  md-12616:   # BBPS: keep definitions and complaint handling; drop operator authorisation, participants, settlement
+    - {from: "2. Applicability The provisions of these Directions", to: "4. Definitions In these Directions"}
+    - {from: "Banks (All Scheduled Commercial Banks", to: "Ensuring customers (including customers of their agent"}
+    - {from: "Non-bank BBPOU operates as Payment Aggregator", to: "8. Complaint Management and Grievance Redressal"}
+    - {from: "9. Supersession of earlier BBPS related guidelines", to: null}
 exclude_terms: []   # case-insensitive substrings; a passage containing one is skipped
 concurrency: 8
 seed: 0

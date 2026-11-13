@@ -122,3 +122,11 @@ def test_aligntune_gets_same_loss_type_as_trl_backend():
     assert trainer.config.train.loss_type == sft["loss_type"] == "chunked_nll"
     src = open("adapters/aligntune_sft.py", encoding="utf-8").read()
     assert 'loss_type=sft["loss_type"]' in src  # trl SFTConfig reads the same key
+
+
+def test_run_eval_warns_when_adapter_is_for_another_seed():
+    from evals.run_eval import seed_mismatch
+
+    assert seed_mismatch("A2", 1, "A2-s1-abc") is None
+    assert seed_mismatch("A0", 2, None) is None
+    assert "A2-s0-abc" in seed_mismatch("A2", 1, "A2-s0-abc")

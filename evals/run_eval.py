@@ -86,6 +86,13 @@ def adapter_provenance(arm: str, adapter: str | None) -> dict:
     return {"backend": meta.get("backend", "unknown"), "adapter_name": meta.get("name")}
 
 
+def seed_mismatch(arm: str, seed: int, adapter_name: str | None) -> str | None:
+    """Warning text when the adapter was trained for another arm or seed than the one being scored."""
+    if arm == "A0" or not adapter_name or adapter_name.startswith(f"{arm}-s{seed}-"):
+        return None
+    return f"warning: scoring {arm} seed {seed} with adapter {adapter_name}; pass --adapter for this seed"
+
+
 def evaluate(engine, arm: str, rows: list[dict], use_judge: bool) -> list[dict]:
     from intelligence.judge import grade
 
@@ -121,6 +128,8 @@ def main() -> None:
 
     adapter = adapter_paths().get(a.arm)
     provenance = adapter_provenance(a.arm, adapter)
+    if msg := seed_mismatch(a.arm, a.seed, provenance["adapter_name"]):
+        print(msg)
 
     engine = build_engine(arms=[a.arm])
     rows = load_split(a.split)

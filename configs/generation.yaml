@@ -56,7 +56,6 @@ exclude_spans:   # sections inside a kept chapter, or in documents without chapt
     - {from: "16. Reporting to Reserve Bank", to: null}   # reporting to RBI, repeal, quarterly report annexure
   ios-2026:
     - {from: "7. Staffing of the Offices of the RBI Ombudsman", to: "Powers and Functions (1)"}
-    - {from: "Removal of Difficulties in the Scheme", to: "20. Repeal of the Existing Schemes"}   # s.20 kept: which scheme covers older complaints
   md-12616:   # BBPS: keep definitions and complaint handling; drop operator authorisation, participants, settlement
     - {from: "2. Applicability The provisions of these Directions", to: "4. Definitions In these Directions"}
     - {from: "Banks (All Scheduled Commercial Banks", to: "Ensuring customers (including customers of their agent"}

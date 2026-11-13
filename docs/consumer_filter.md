@@ -42,10 +42,10 @@ From `intelligence.generate.load_paragraphs` (after the contents-page and minimu
 
 | Split | Before | After | Dropped |
 |---|---:|---:|---:|
-| train | 1815 | 1533 | 282 |
+| train | 1815 | 1534 | 281 |
 | dev | 224 | 140 | 84 |
 | test | 463 | 418 | 45 |
-| **total** | **2502** | **2091** | **411** |
+| **total** | **2502** | **2092** | **410** |
 
 | Document | Split | Before | After |
 |---|---|---:|---:|
@@ -56,7 +56,7 @@ From `intelligence.generate.load_paragraphs` (after the contents-page and minimu
 | md-13642 Digital Payment Security | test | 104 | 59 |
 | md-13157 Interest on Deposits | train | 84 | 79 |
 | md-13271 Internal Ombudsman | train | 54 | 29 |
-| ios-2026 Integrated Ombudsman Scheme | train | 81 | 79 |
+| ios-2026 Integrated Ombudsman Scheme | train | 81 | 80 |
 | md-12616 BBPS | train | 21 | 13 |
 | md-13156 Credit Facilities (unchanged) | train | 198 | 198 |
 
@@ -188,7 +188,7 @@ needs 200 jobs at 2 questions per call, so each of the 140 passages is used abou
 | 1-6 | Scope, definitions, ombudsman offices, CRPC | 16 (p1-16) | keep | who is covered, where complaints go |
 | 7 | Staffing of ombudsman offices | 1 (p17) | exclude | RBI internal |
 | 8-18 | Powers, grounds, filing, resolution, award, appeal, display duties | 46 (p18-63) | keep | the customer complaint process |
-| 19 | Removal of difficulties | 1 (p64) | exclude | RBI power |
+| 19 | Removal of difficulties | 1 (p64) | keep | user decision: keep all of § 19-20 |
 | 20 | Repeal of the 2021 scheme, pending complaints | 2 (p65-66) | keep | which scheme covers complaints before July 1, 2026 (reviewer) |
 | Annexes | Guidance for filing, complaint form | 17 (p67-83) | keep | how to file, compensation caps |
 
@@ -213,5 +213,5 @@ needs 200 jobs at 2 questions per call, so each of the 140 passages is used abou
 4. md-13140 X annexes (64 passages): kept. They include blank claim and indemnity forms that may give weak questions,
    but also the list of documents for a deceased-depositor claim.
 5. md-13155 V Co-branding (8 passages): kept; mostly bank-partner arrangements, with some data-sharing rules.
-6. ios-2026 § 20 (p65-66): now kept (T4 reviewer); only § 19 (p64) excluded.
+6. ios-2026 § 19-20 (p64-66): kept (user decision); which scheme covers older complaints is a real customer question.
 7. Dev split shrinks from 224 to 140 source passages (PPI only); see note above.

@@ -32,6 +32,7 @@ SAMPLE = {
     "arm": "A1", "seed": "0", "BACKEND": "aligntune", "HUB_ARG": "--hub-org my-org",
     "A2": "checkpoints/A2-s0-abc1234", "DEV_ADAPTER": "checkpoints/A2-s0-abc1234",
     "adapter_arg": "--adapter checkpoints/A1-s0-abc1234", "ARM": "A3", "P_IN": "2.5", "P_OUT": "10",
+    "RESUME_ARM": "A2", "RESUME_SEED": "1", "RESUME_REPO": "my-org/dhanground-A2-s1-abc1234",
 }
 
 

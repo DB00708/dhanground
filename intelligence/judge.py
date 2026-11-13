@@ -39,7 +39,7 @@ def format_passages(passages: list[dict]) -> str:
 def _call(prompt: str, complete: Callable[[str], str] | None) -> dict:
     if complete is None:
         model = llm.judge_model()
-        complete = lambda p: llm.complete(model, p, temperature=0.0, max_tokens=300)  # noqa: E731
+        complete = lambda p: llm.complete(model, p, temperature=0.0, max_tokens=4096)  # noqa: E731  (thinking models)
     data = llm.parse_json(complete(prompt))
     if not isinstance(data, dict):
         raise ValueError(f"judge returned {type(data).__name__}, expected an object")

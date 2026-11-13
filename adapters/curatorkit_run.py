@@ -40,6 +40,8 @@ def run_gates(rows: list[dict], work_dir: Path, judge_model: str | None,
         max_tokens=4096,
         llm_model=judge_model if use_judge else None,
         judge_llm_model=judge_model if use_judge else None,
+        llm_max_tokens=4096,
+        judge_llm_max_tokens=4096,  # CuratorKIT's 512 default truncates thinking models, and truncation rejects
         hallucination_threshold=hallucination_threshold if use_judge else None,
         reward_threshold=reward_threshold if use_judge else None,
         export_formats=["alpaca"],

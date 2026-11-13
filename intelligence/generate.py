@@ -307,7 +307,8 @@ def generate(index_dir: Path, splits_path: Path, out_dir: Path, cfg: dict,
     retriever = Retriever(index_dir)
     if complete is None:
         model = llm.teacher_model()
-        complete = lambda prompt: llm.complete(model, prompt, temperature=0.8)  # noqa: E731
+        # Thinking models spend output tokens before the JSON; 1,500 truncated ~27% of Gemini 3.x replies.
+        complete = lambda prompt: llm.complete(model, prompt, temperature=0.8, max_tokens=8192)  # noqa: E731
         generator = f"{model}@{date.today().isoformat()}"
 
     out_dir.mkdir(parents=True, exist_ok=True)

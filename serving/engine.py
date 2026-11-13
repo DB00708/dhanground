@@ -15,6 +15,7 @@ from core.template import Passage, render_user
 ARMS = ("A0", "A1", "A2", "A3")
 MAX_NEW_TOKENS = 384
 ARM_TIMEOUT_S = 10.0
+UNSUPPORTED_NOTE = "Supported languages: Hindi, Hinglish and English. Answering in English."
 
 REPAIR_SUFFIX = "\n\nYour previous reply was not valid: {error}\nReturn one JSON object and nothing else."
 
@@ -82,9 +83,16 @@ class AnswerEngine:
 
     def answer(self, question: str, arm: str, request_id: str = "", passages: list[dict] | None = None,
                show_passages: bool = False) -> EngineResult:
-        start = time.monotonic()
         q_lang = langmod.detect(question)
-        reply_lang = q_lang if q_lang in ABSTAIN_MESSAGES else "en"
+        result = self._answer(question, q_lang, arm, request_id, passages, show_passages)
+        if q_lang == langmod.OTHER:
+            result.response["note"] = UNSUPPORTED_NOTE
+        return result
+
+    def _answer(self, question: str, q_lang: str, arm: str, request_id: str, passages: list[dict] | None,
+                show_passages: bool) -> EngineResult:
+        start = time.monotonic()
+        reply_lang = langmod.reply_lang(q_lang)
         base = {"request_id": request_id, "arm": arm, "source": "live",
                 "index_version": getattr(self.retriever, "index_version", None)}
         meta: dict[str, dict] = {}
@@ -120,7 +128,10 @@ class AnswerEngine:
             return EngineResult(self._abstained(base, reply_lang, "schema", start, passages, show_passages, {
                 "schema": "fail", "citations": "n/a", "claim_check": "n/a"}), raw_outputs)
 
-        v = validate(output, typed, question)
+        v = validate(output, typed, question, question_lang=q_lang)
+        if q_lang == langmod.OTHER and v.status == "ok" and not langmod.answer_lang_ok(v.answer, langmod.EN):
+            return EngineResult(self._abstained(base, "en", "language", start, passages, show_passages, {
+                k: v.checks.get(k, "n/a") for k in ("schema", "citations", "claim_check")}), raw_outputs)
         by_pid = {p["pid"]: p for p in passages}
         response = {
             **base,

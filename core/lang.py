@@ -51,3 +51,23 @@ def detect(text: str) -> str:
     if hits >= 2 or (hits >= 1 and hits / len(latin_words) >= 0.15):
         return HI_LATN
     return EN
+
+
+def reply_lang(question_lang: str) -> str:
+    return EN if question_lang == OTHER else question_lang
+
+
+_CITATION_RE = re.compile(r"\[[^\]]*\]")
+
+
+def answer_lang_ok(answer: str, expected: str) -> bool:
+    """Does the answer fit the expected reply language?
+
+    Citation markers ([rbi-11693-p15]) are dropped first: their Latin letters would make a Tamil or
+    Devanagari answer look English. An expected-English answer may not hold non-ASCII letters.
+    Answers with no letters (amounts, dates) carry no language, so they fit any expected language."""
+    text = _CITATION_RE.sub(" ", answer)
+    if expected == EN and any(ch.isalpha() and not ch.isascii() for ch in text):
+        return False
+    got = detect(text)
+    return got == expected or (got == OTHER and not any(ch.isalpha() for ch in text))

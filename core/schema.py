@@ -128,10 +128,14 @@ def truncate_words(text: str, limit: int = MAX_WORDS) -> str:
     return " ".join(kept) if kept else " ".join(text.split()[:limit])
 
 
-def validate(output: ModelOutput, passages: list[Passage], question: str) -> Validated:
-    """V2..V5 on a schema-valid output. V1 (parse + repair retry) happens in the answer service."""
-    question_lang = langmod.detect(question)
-    reply_lang = question_lang if question_lang in ABSTAIN_MESSAGES else "en"
+def validate(output: ModelOutput, passages: list[Passage], question: str,
+             question_lang: str | None = None) -> Validated:
+    """V2..V5 on a schema-valid output. V1 (parse + repair retry) happens in the answer service.
+
+    Callers that already ran langmod.detect(question) pass question_lang to skip a second detect."""
+    if question_lang is None:
+        question_lang = langmod.detect(question)
+    reply_lang = langmod.reply_lang(question_lang)
     checks = {"schema": "pass"}
 
     if not output.answerable:
@@ -148,6 +152,6 @@ def validate(output: ModelOutput, passages: list[Passage], question: str) -> Val
     answer = truncate_words(output.answer)
     cc = claimcheck.check(answer, [by_pid[pid].text for pid in cited])
     checks["claim_check"] = cc.status
-    checks["lang"] = "pass" if output.lang == question_lang else "fail"
+    checks["lang"] = "pass" if output.lang == reply_lang else "fail"
 
     return Validated("ok", True, answer, output.lang, cited, checks, None, cc.unsupported)

@@ -85,3 +85,51 @@ def test_given_passages_bypass_retrieval():
     passages = [{"pid": "rbi-11693-p15", "text": "UPI: auto reversal latest on T + 1 day."}]
     r = AnswerEngine(FakeGen([GOOD]), retriever=None).answer(Q, "A2", passages=passages).response
     assert r["status"] == "ok"
+
+
+TAMIL_Q = "UPI பணம் எப்போது திரும்ப வரும்?"
+UPI_PASSAGES = [{"pid": "rbi-11693-p15", "text": "UPI: auto reversal latest on T + 1 day."}]
+
+
+def _tamil_answer(answer):
+    out = json.dumps({"answerable": True, "answer": answer, "cited_pids": ["rbi-11693-p15"], "lang": "en"})
+    return AnswerEngine(FakeGen([out]), retriever=None).answer(TAMIL_Q, "A3", passages=UPI_PASSAGES).response
+
+
+def test_other_language_english_answer_served_with_note():
+    r = _tamil_answer("Auto reversal happens latest on T + 1 day [rbi-11693-p15]")
+    assert r["status"] == "ok" and "Hinglish" in r["note"]
+
+
+def test_other_language_non_english_answer_abstains_in_english():
+    r = _tamil_answer("T + 1 நாளில் பணம் திரும்ப வரும் [rbi-11693-p15]")
+    assert r["status"] == "abstained" and r["abstain_reason"] == "language"
+    assert r["answer"] == ABSTAIN_MESSAGES["en"] and r["lang"] == "en" and "Hinglish" in r["note"]
+
+
+def test_other_language_numeric_answer_served():
+    r = _tamil_answer("10,000")
+    assert r["status"] == "ok" and "note" in r
+
+
+def test_other_language_note_on_gate_and_timeout(index_dir):
+    gated = AnswerEngine(FakeGen([]), Retriever(index_dir), tau=1e9).answer(TAMIL_Q, "A3").response
+    timed = AnswerEngine(FakeGen([TimeoutGeneration("A3")]), retriever=None).answer(
+        TAMIL_Q, "A3", passages=UPI_PASSAGES).response
+    assert gated["abstain_reason"] == "retrieval" and "Hinglish" in gated["note"]
+    assert gated["answer"] == ABSTAIN_MESSAGES["en"]
+    assert timed["status"] == "timeout" and "Hinglish" in timed["note"]
+
+
+def test_question_language_detected_once_per_request(monkeypatch):
+    from core import lang as langmod
+    calls = []
+    real = langmod.detect
+    monkeypatch.setattr(langmod, "detect", lambda text: calls.append(text) or real(text))
+    _tamil_answer("Auto reversal happens latest on T + 1 day [rbi-11693-p15]")
+    assert calls.count(TAMIL_Q) == 1
+
+
+def test_other_language_answer_with_citation_and_acronyms_abstains():
+    r = _tamil_answer("T + 1 நாள் [rbi-11693-p15]")
+    assert r["status"] == "abstained" and r["abstain_reason"] == "language" and "Hinglish" in r["note"]

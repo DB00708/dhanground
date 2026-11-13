@@ -35,6 +35,7 @@ def _require(name: str) -> str:
 def complete(model: str, prompt: str, temperature: float = 0.7, max_tokens: int = 1500) -> str:
     import litellm
 
+    litellm.drop_params = True  # some models (e.g. Gemini 3.x) reject a custom temperature
     for attempt, delay in enumerate((*RETRY_DELAYS_S, None)):
         try:
             resp = litellm.completion(

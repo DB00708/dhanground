@@ -107,7 +107,18 @@ def test_summary_reports_backend_per_seed(monkeypatch, tmp_path):
 
 def test_lora_yaml_settings_valid_for_both_backends():
     sft = yaml.safe_load(open("configs/lora.yaml", encoding="utf-8"))["sft"]
-    assert sft["loss_type"] in {"nll", "dft"}  # AlignTune 0.1.33 rejects anything else
+    assert sft["loss_type"] in {"nll", "dft", "chunked_nll"}
     assert grad_accum(sft) * sft["per_device_batch_size"] == sft["effective_batch_size"]
     with pytest.raises(SystemExit):
         grad_accum({"effective_batch_size": 16, "per_device_batch_size": 3})
+
+
+def test_aligntune_gets_same_loss_type_as_trl_backend():
+    from adapters.aligntune_sft import set_loss_type
+
+    trainer = types.SimpleNamespace(config=types.SimpleNamespace(train=types.SimpleNamespace(loss_type="nll")))
+    sft = yaml.safe_load(open("configs/lora.yaml", encoding="utf-8"))["sft"]
+    set_loss_type(trainer, sft["loss_type"])
+    assert trainer.config.train.loss_type == sft["loss_type"] == "chunked_nll"
+    src = open("adapters/aligntune_sft.py", encoding="utf-8").read()
+    assert 'loss_type=sft["loss_type"]' in src  # trl SFTConfig reads the same key

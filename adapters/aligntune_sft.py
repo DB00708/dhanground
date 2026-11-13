@@ -85,6 +85,15 @@ def grad_accum(sft: dict) -> int:
     return n // b
 
 
+def set_loss_type(trainer, loss_type: str) -> None:
+    """Give AlignTune the same loss_type as the trl backend.
+
+    AlignTune 0.1.33 checks loss_type in {nll, dft} only in TrainingConfig.__post_init__; build_sft_config reads
+    config.train.loss_type at train() time and passes it to trl's SFTConfig, which also accepts chunked_nll.
+    """
+    trainer.config.train.loss_type = loss_type
+
+
 def train_aligntune(base: str, data_dir: Path, out: Path, lora: dict, seed: int, n_rows: int) -> None:
     from aligntune.core.backend_factory import create_sft_trainer
 
@@ -98,7 +107,7 @@ def train_aligntune(base: str, data_dir: Path, out: Path, lora: dict, seed: int,
         num_epochs=sft["epochs"],
         batch_size=sft["per_device_batch_size"],
         gradient_accumulation_steps=grad_accum(sft),
-        loss_type=sft["loss_type"],
+        loss_type="nll",  # AlignTune's TrainingConfig accepts only nll/dft here; set_loss_type applies ours
         learning_rate=sft["lr"],
         lr_scheduler=sft["scheduler"],
         warmup_ratio=sft["warmup_ratio"],
@@ -117,6 +126,7 @@ def train_aligntune(base: str, data_dir: Path, out: Path, lora: dict, seed: int,
         report_to="none",
         gradient_checkpointing=True,
     )
+    set_loss_type(trainer, sft["loss_type"])
     trainer.setup_model()
     trainer.setup_data()
     # CuratorKIT's schema gate runs inside setup_data; a silently dropped row would make the backends differ.

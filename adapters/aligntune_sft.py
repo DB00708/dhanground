@@ -88,10 +88,13 @@ def grad_accum(sft: dict) -> int:
 def set_loss_type(trainer, loss_type: str) -> None:
     """Give AlignTune the same loss_type as the trl backend.
 
-    AlignTune 0.1.33 checks loss_type in {nll, dft} only in TrainingConfig.__post_init__; build_sft_config reads
-    config.train.loss_type at train() time and passes it to trl's SFTConfig, which also accepts chunked_nll.
+    AlignTune 0.1.33 checks loss_type in {nll, dft} only in TrainingConfig.__post_init__, so it is NOT passed to
+    create_sft_trainer (the default nll passes the check). build_sft_config reads config.train.loss_type at
+    train() time, then overlays config.train.extra_params (the leftover factory kwargs, which "always win"), so
+    a loss_type there must not exist.
     """
     trainer.config.train.loss_type = loss_type
+    trainer.config.train.extra_params.pop("loss_type", None)
 
 
 def train_aligntune(base: str, data_dir: Path, out: Path, lora: dict, seed: int, n_rows: int) -> None:
@@ -107,7 +110,6 @@ def train_aligntune(base: str, data_dir: Path, out: Path, lora: dict, seed: int,
         num_epochs=sft["epochs"],
         batch_size=sft["per_device_batch_size"],
         gradient_accumulation_steps=grad_accum(sft),
-        loss_type="nll",  # AlignTune's TrainingConfig accepts only nll/dft here; set_loss_type applies ours
         learning_rate=sft["lr"],
         lr_scheduler=sft["scheduler"],
         warmup_ratio=sft["warmup_ratio"],
@@ -136,6 +138,8 @@ def train_aligntune(base: str, data_dir: Path, out: Path, lora: dict, seed: int,
                          "fix the rows or train this seed with --backend trl")
     trainer.dataset = trainer.train_dataset
     trainer.train()
+    used = getattr(getattr(getattr(trainer, "trainer", None), "args", None), "loss_type", None)
+    print(f"AlignTune trained with loss_type={used} (configured {sft['loss_type']})", flush=True)
     if hasattr(trainer, "save_model"):
         trainer.save_model(str(out))
 

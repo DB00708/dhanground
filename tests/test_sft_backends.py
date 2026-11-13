@@ -116,12 +116,16 @@ def test_lora_yaml_settings_valid_for_both_backends():
 def test_aligntune_gets_same_loss_type_as_trl_backend():
     from adapters.aligntune_sft import set_loss_type
 
-    trainer = types.SimpleNamespace(config=types.SimpleNamespace(train=types.SimpleNamespace(loss_type="nll")))
+    train = types.SimpleNamespace(loss_type="nll", extra_params={"loss_type": "nll", "seed": 0})
+    trainer = types.SimpleNamespace(config=types.SimpleNamespace(train=train))
     sft = yaml.safe_load(open("configs/lora.yaml", encoding="utf-8"))["sft"]
     set_loss_type(trainer, sft["loss_type"])
-    assert trainer.config.train.loss_type == sft["loss_type"] == "chunked_nll"
+    assert train.loss_type == sft["loss_type"] == "chunked_nll"
+    # extra_params override config.train in AlignTune's build_sft_config, so no loss_type may remain there
+    assert "loss_type" not in train.extra_params and train.extra_params == {"seed": 0}
     src = open("adapters/aligntune_sft.py", encoding="utf-8").read()
-    assert 'loss_type=sft["loss_type"]' in src  # trl SFTConfig reads the same key
+    aligntune_call = src[src.index("create_sft_trainer("):src.index("set_loss_type(trainer")]
+    assert "loss_type" not in aligntune_call  # passing it would land in extra_params
 
 
 def test_run_eval_warns_when_adapter_is_for_another_seed():

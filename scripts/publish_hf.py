@@ -179,6 +179,20 @@ def snapshot_date(root: Path) -> str:
     return manifest["written_at"][:10]
 
 
+def training_logs(root: Path) -> list[Item]:
+    """Per local training run: its dhanground.json and the newest checkpoint's trainer_state.json (optional)."""
+    items = []
+    for rec in sorted([*(root / "checkpoints").glob("*/dhanground.json"),
+                       *(root / "checkpoints").glob("*/final/dhanground.json")]):
+        run = rec.parent if rec.parent.name != "final" else rec.parent.parent
+        items.append(Item(rec, f"training_logs/{run.name}/dhanground.json"))
+        states = sorted(run.glob("checkpoint-*/trainer_state.json"),
+                        key=lambda q: int(q.parent.name.split("-")[-1]) if q.parent.name.split("-")[-1].isdigit() else -1)
+        if states:
+            items.append(Item(states[-1], f"training_logs/{run.name}/trainer_state.json"))
+    return items
+
+
 def build_repos(root: Path) -> list[DatasetRepo]:
     corpus = DatasetRepo(
         "dhanground-rbi-corpus", "DhanGround RBI corpus",
@@ -201,14 +215,18 @@ def build_repos(root: Path) -> list[DatasetRepo]:
          "Test: hand-checked, sampled and frozen with hand-written adversarial rows "
          "(`pipeline/build_arms.py freeze`); see `test_set_card.md`. `frozen_test/test.sha256` pins the file; "
          "the evaluator refuses a mismatch and scores each (arm, seed) on test once.",
-         "Results: `results/` holds per-(arm, seed) metrics with bootstrap CIs, verdicts, the summary and ROI."],
+         "Results: `results/` holds per-(arm, seed) metrics with bootstrap CIs, per-row verdicts (eval traces), "
+         "the summary, general capability and ROI.",
+         "Training logs: `training_logs/<run>/` holds each local run's `dhanground.json` (arm, seed, base, backend) "
+         "and the `trainer_state.json` (loss log) of its newest checkpoint, when present."],
         [Item(root / f"data/curated/{s}.jsonl", f"data/{s}.jsonl") for s in ("train", "dev", "test")]
         + [Item(root / "data/curated/gate_log.jsonl", "data/gate_log.jsonl"),
            Item(root / "data/test/test.jsonl", "frozen_test/test.jsonl"),
            Item(root / "data/test/test.sha256", "frozen_test/test.sha256"),
            Item(root / "evals/test_set_card.md", "test_set_card.md")]
         + [Item(p, f"results/{p.relative_to(root / 'evals/results').as_posix()}")
-           for p in sorted((root / "evals/results").rglob("*")) if p.is_file()],
+           for p in sorted((root / "evals/results").rglob("*")) if p.is_file()]
+        + training_logs(root),
     )
     pairs = DatasetRepo(
         "dhanground-dpo-pairs", "DhanGround DPO pairs",

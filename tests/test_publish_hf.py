@@ -57,6 +57,9 @@ def repo(tmp_path):
         (root / "checkpoints" / name / "dhanground.json").write_text("{}")
     (root / "checkpoints/A3-s0-abc1234/final").mkdir(parents=True)
     (root / "checkpoints/A3-s0-abc1234/final/dhanground.json").write_text("{}")
+    for step in (5, 40, 100):  # newest by step number, not by name
+        (root / f"checkpoints/A2-s0-abc1234/checkpoint-{step}").mkdir()
+        (root / f"checkpoints/A2-s0-abc1234/checkpoint-{step}/trainer_state.json").write_text(json.dumps({"step": step}))
     return root
 
 
@@ -175,7 +178,10 @@ def test_push_private_uploads_datasets_cards_and_collection(repo, hub):
     qa = hub.uploads["org/dhanground-hinglish-qa"]
     assert set(qa) == {"README.md", "data/train.jsonl", "data/dev.jsonl", "data/test.jsonl", "data/gate_log.jsonl",
                        "frozen_test/test.jsonl", "frozen_test/test.sha256", "test_set_card.md",
-                       "results/A2_s0_test.json", "results/summary_test.md"}
+                       "results/A2_s0_test.json", "results/summary_test.md",
+                       "training_logs/A2-s0-abc1234/dhanground.json", "training_logs/A2-s0-abc1234/trainer_state.json",
+                       "training_logs/A1-s1-abc1234/dhanground.json", "training_logs/A3-s0-abc1234/dhanground.json"}
+    assert json.loads(qa["training_logs/A2-s0-abc1234/trainer_state.json"]) == {"step": 100}
     assert qa["frozen_test/test.jsonl"] == (repo / "data/test/test.jsonl").read_text(encoding="utf-8")
     assert set(hub.uploads["org/dhanground-dpo-pairs"]) == {"README.md", "data/A3_pairs.jsonl"}
     # a re-run removes files an earlier publish left behind

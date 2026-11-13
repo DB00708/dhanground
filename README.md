@@ -96,7 +96,7 @@ python scripts/publish_hf.py --org <org> --push --public
 ```
 
 This creates the datasets `dhanground-rbi-corpus`, `dhanground-hinglish-qa` (curated splits, gate log, frozen
-test set, results) and `dhanground-dpo-pairs`, each with a dataset card, and two collections: "DhanGround datasets"
+test set, eval results and traces, training logs) and `dhanground-dpo-pairs`, each with a dataset card, and two collections: "DhanGround datasets"
 (the three datasets) and "DhanGround models" (the base model and every `<org>/dhanground-*` adapter repo). Report toolkit bugs in `docs/upstream_issues.md`.
 
 ## Contracts

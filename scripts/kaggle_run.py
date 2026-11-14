@@ -37,6 +37,9 @@ TASKS = {
         "parallel": False,
     },
     "sft-seed0": {
+        # Fail fast in the same session (one queue wait, one setup): no training if the fp16 smoke test says no-go.
+        "pre": [["python", "-m", "scripts.smoke_train", "--rows", "data/smoke/train.jsonl",
+                 "--n", "48", "--steps", "24", "--per-device", "2"]],
         "steps": [["python", "-m", "adapters.aligntune_sft", "--arm", "A1", "--seed", "0", "--backend", "aligntune"],
                   ["python", "-m", "adapters.aligntune_sft", "--arm", "A2", "--seed", "0", "--backend", "aligntune"]],
         "parallel": True,
@@ -69,6 +72,8 @@ if not work:
 for d in work:
     shutil.copytree(d, os.path.join("data", os.path.basename(d)), dirs_exist_ok=True)
 os.environ["DHANGROUND_GIT_SHA"] = CFG["sha"][:7]
+for s in CFG.get("pre", []):
+    sh([sys.executable if a == "python" else a for a in s])
 steps = [[sys.executable if a == "python" else a for a in s] for s in CFG["steps"]]
 if CFG["parallel"]:
     procs = []
@@ -115,7 +120,7 @@ def git_sha() -> str:
 def build_kernel(task: str, sha: str, kuser: str, folder: Path) -> Path:
     t = TASKS[task]
     cfg = {"repo_url": REPO_URL, "sha": sha, "dataset": f"{kuser}/{DATASET}", "parallel": t["parallel"],
-           "steps": t["steps"]}
+           "pre": t.get("pre", []), "steps": t["steps"]}
     (folder / "run.py").write_text(KERNEL_SCRIPT.replace("__CFG__", repr(json.dumps(cfg))), encoding="utf-8")
     meta = {"id": f"{kuser}/{NOTEBOOK}", "title": NOTEBOOK, "code_file": "run.py", "language": "python",
             "kernel_type": "script", "is_private": True, "enable_gpu": True, "enable_tpu": False,

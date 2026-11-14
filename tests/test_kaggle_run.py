@@ -37,6 +37,7 @@ def test_seed0_trains_both_arms_in_parallel_with_aligntune():
     assert TASKS["sft-seed0"]["parallel"] and len(steps) == 2
     assert {s[s.index("--arm") + 1] for s in steps} == {"A1", "A2"}
     assert all(s[s.index("--backend") + 1] == "aligntune" and s[s.index("--seed") + 1] == "0" for s in steps)
+    assert TASKS["sft-seed0"]["pre"][0][2] == "scripts.smoke_train"  # smoke gate runs first, same session
 
 
 def test_stage_dir_is_private_and_trims_smoke(tmp_path, monkeypatch):

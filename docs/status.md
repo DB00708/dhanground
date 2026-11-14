@@ -82,6 +82,8 @@ Review and integration results are logged in tests/e2e/INTEGRATION_LOG.md on the
 | 2026-11-13 | T1–T10 | Integration PASS (Docker) | main @ a6e6480 (integration 37bb401) | 235 unit passed / 4 skipped; e2e 10/10 in 82 s incl. evals.summarize; image installs CPU torch then requirements.txt |
 | 2026-11-13 | compute | Decision | — | HF rejects Indian cards; rules allow training anywhere (only artifacts on HF). Primary compute = Kaggle T4 ×2, fp16 run-wide (account divyanshbhatia007, token verified); T11 extended with a Kaggle backend + precision setting |
 | 2026-11-13 | real run | Generation DONE | main @ ebe3780 | 6,100 raw rows (train 5,000 / dev 400 / test 700); 81% answerable, 19% unanswerable, 4% adversarial; 228 typo, 439 two-passage; 0 failed jobs after token fix; curation trial on dev running (Gemini 3.1 Pro judge) |
+| 2026-11-14 | real run | Curation DONE | main @ 977db51 | judge = Gemini 3.5 Flash-Lite (thinking judges truncated JSON under load: 30–75% false rejects); train 5,000→4,133, dev 400→353, test 700→588; removed ~700 low-quality, 187 mislabelled unanswerable, 55 invented-number rows |
+| 2026-11-14 | real run | Arms BUILT | 977db51 | A1 = A2 = 3,000 rows, identical strata; A1 has 531 rows that fail curation incl. 28 invented-number answers, A2 has 0; 17 cross-split duplicates dropped (test untouched); staged to private HF dataset divyansh-b/dhanground-work |
 | 2026-11-12 | T5 | Reviewer APPROVED | claude/eval-set-cc3068 @ c427d83 | tau tuning only; 3 optional nits, no blockers |
 
 ## Edge-case catalog (design: 20 cases)

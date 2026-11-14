@@ -32,12 +32,27 @@ def torch_dtype(p: str):
 
 
 def load_configs() -> tuple[dict, dict]:
+    """configs/arms.yaml + configs/lora.yaml. DHANGROUND_BASE_PATH points base_model at a local copy of the
+    weights (e.g. Kaggle's mounted Tiny Aya), so a GPU box needs no Hub token for the gated model."""
+    import os
+
+    arms, lora = _read_configs()
+    if os.environ.get("DHANGROUND_BASE_PATH"):
+        arms["base_model"] = os.environ["DHANGROUND_BASE_PATH"]
+    return arms, lora
+
+
+def _read_configs() -> tuple[dict, dict]:
     arms = yaml.safe_load(Path("configs/arms.yaml").read_text(encoding="utf-8"))
     lora = yaml.safe_load(Path("configs/lora.yaml").read_text(encoding="utf-8"))
     return arms, lora
 
 
 def git_sha() -> str:
+    import os
+
+    if os.environ.get("DHANGROUND_GIT_SHA"):  # set by GPU runners that check out a commit without .git
+        return os.environ["DHANGROUND_GIT_SHA"]
     try:
         return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], text=True).strip()
     except (subprocess.CalledProcessError, FileNotFoundError):

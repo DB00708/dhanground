@@ -60,12 +60,17 @@ CFG = json.loads(__CFG__)
 configs = [os.path.dirname(p) for p in glob.glob("/kaggle/input/**/config.json", recursive=True) if "tiny-aya" in p.lower()]
 if not configs:
     sys.exit("NO_BASE_MODEL: Tiny Aya is not attached; inputs: %s" % os.listdir("/kaggle/input"))
-os.environ.update({"DHANGROUND_BASE_PATH": configs[0], "DHANGROUND_PRECISION": "fp16",
+os.environ.update({"DHANGROUND_PRECISION": "fp16",
                    "TOKENIZERS_PARALLELISM": "false", "HF_HUB_OFFLINE": "1"})
 print("base model:", configs[0], flush=True)
 root = "/kaggle/working/dhanground"
 sh(["git", "clone", "-q", CFG["repo_url"], root]); os.chdir(root); sh(["git", "checkout", "-q", CFG["sha"]])
 shutil.rmtree(".git", ignore_errors=True)  # keep the notebook output small
+sys.path.insert(0, root)
+from adapters.common import flatten_chat_template
+base = "/kaggle/working/base"
+print("chat template:", flatten_chat_template(configs[0], base), flush=True)
+os.environ["DHANGROUND_BASE_PATH"] = base
 sh([sys.executable, "-m", "pip", "install", "-q", "aligntune==0.1.33", "curatorkit==0.1.24", "pydantic", "PyYAML"])
 sh([sys.executable, "-c", "import torch;print('torch', torch.__version__, 'cuda', torch.cuda.is_available(), torch.cuda.device_count())"])
 work = [p for p in glob.glob("/kaggle/input/**/arms", recursive=True)] + glob.glob("/kaggle/input/**/smoke", recursive=True)
@@ -77,7 +82,9 @@ os.environ["DHANGROUND_GIT_SHA"] = CFG["sha"][:7]
 for s in CFG.get("pre", []):
     sh([sys.executable if a == "python" else a for a in s])
 steps = [[sys.executable if a == "python" else a for a in s] for s in CFG["steps"]]
-if CFG["parallel"]:
+import torch
+n_gpu = torch.cuda.device_count()
+if CFG["parallel"] and n_gpu >= len(steps):
     procs = []
     for gpu, s in enumerate(steps):
         env = dict(os.environ, CUDA_VISIBLE_DEVICES=str(gpu))
@@ -122,7 +129,7 @@ def git_sha() -> str:
 def build_kernel(task: str, sha: str, kuser: str, folder: Path, p100: bool = False) -> Path:
     t = TASKS[task]
     notebook, shape = (P100["notebook"], P100["shape"]) if p100 else (NOTEBOOK, SHAPE)
-    cfg = {"repo_url": REPO_URL, "sha": sha, "dataset": f"{kuser}/{DATASET}", "parallel": t["parallel"] and not p100,
+    cfg = {"repo_url": REPO_URL, "sha": sha, "dataset": f"{kuser}/{DATASET}", "parallel": t["parallel"],
            "pre": t.get("pre", []), "steps": t["steps"]}
     (folder / "run.py").write_text(KERNEL_SCRIPT.replace("__CFG__", repr(json.dumps(cfg))), encoding="utf-8")
     meta = {"id": f"{kuser}/{notebook}", "title": notebook, "code_file": "run.py", "language": "python",

@@ -57,4 +57,23 @@ def test_p100_copy_is_its_own_notebook_and_runs_steps_in_sequence(tmp_path):
     meta = json.loads((tmp_path / "kernel-metadata.json").read_text())
     assert meta["id"] == "kuser/dhanground-gpu-p100" and meta["machine_shape"] == "NvidiaTeslaP100"
     script = (tmp_path / "run.py").read_text()
-    assert '\\"parallel\\": false' in script or '"parallel": false' in script
+    assert "n_gpu >= len(steps)" in script and "flatten_chat_template" in script  # parallel only with enough GPUs
+
+
+def test_flatten_chat_template_picks_default(tmp_path, monkeypatch):
+    import os
+    import shutil
+
+    from adapters.common import flatten_chat_template
+
+    monkeypatch.setattr(os, "symlink", lambda a, b, target_is_directory=False: shutil.copy(a, b))  # Windows: no symlink rights
+
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "config.json").write_text("{}")
+    (src / "tokenizer_config.json").write_text(json.dumps({"chat_template": [
+        {"name": "rag", "template": "R"}, {"name": "default", "template": "D"}], "model_max_length": 9}))
+    name = flatten_chat_template(src, tmp_path / "dst")
+    cfg = json.loads((tmp_path / "dst" / "tokenizer_config.json").read_text())
+    assert name == "default" and cfg["chat_template"] == "D" and cfg["model_max_length"] == 9
+    assert (tmp_path / "dst" / "config.json").exists()

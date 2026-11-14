@@ -42,6 +42,32 @@ def load_configs() -> tuple[dict, dict]:
     return arms, lora
 
 
+def flatten_chat_template(src: str | Path, dst: str | Path) -> str:
+    """Mirror a read-only model folder into dst with one plain-string chat template; returns the template's name.
+
+    Older Cohere tokenizer_config.json files (e.g. Kaggle Models' Tiny Aya copy) hold chat_template as a list of
+    named templates; transformers then exposes a dict, which TRL's assistant-mask patching cannot read. We keep
+    the template named "default" (else the first). Weights are symlinked, not copied.
+    """
+    import json
+    import os
+
+    src, dst = Path(src), Path(dst)
+    dst.mkdir(parents=True, exist_ok=True)
+    for f in src.iterdir():
+        if f.name in ("tokenizer_config.json", "additional_chat_templates") or (dst / f.name).exists():
+            continue
+        os.symlink(f, dst / f.name, target_is_directory=f.is_dir())
+    cfg = json.loads((src / "tokenizer_config.json").read_text(encoding="utf-8"))
+    tpl, name = cfg.get("chat_template"), "string"
+    if isinstance(tpl, list):
+        by_name = {t["name"]: t["template"] for t in tpl}
+        name = "default" if "default" in by_name else tpl[0]["name"]
+        cfg["chat_template"] = by_name[name]
+    (dst / "tokenizer_config.json").write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+    return name
+
+
 def _read_configs() -> tuple[dict, dict]:
     arms = yaml.safe_load(Path("configs/arms.yaml").read_text(encoding="utf-8"))
     lora = yaml.safe_load(Path("configs/lora.yaml").read_text(encoding="utf-8"))

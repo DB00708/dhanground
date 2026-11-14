@@ -24,7 +24,7 @@ def test_kernel_pins_commit_gpu_fp16_and_never_embeds_tokens(tmp_path, monkeypat
         build_kernel(task, "a" * 40, "someone", "kuser", d)
         meta = json.loads((d / "kernel-metadata.json").read_text())
         assert meta["enable_gpu"] and meta["enable_internet"] and meta["is_private"]
-        assert meta["id"] == f"kuser/dhanground-{task}" and meta["machine_shape"] == "NvidiaTeslaT4"
+        assert meta["id"] == "kuser/dhanground-gpu" and meta["machine_shape"] == "NvidiaTeslaT4"
         script = (d / "run.py").read_text()
         py_compile.compile(str(d / "run.py"), doraise=True)
         assert "a" * 40 in script and "DHANGROUND_PRECISION" in script and "UserSecretsClient" in script

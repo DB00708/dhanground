@@ -104,7 +104,8 @@ def git_sha() -> str:
 
 
 def kernel_slug(task: str) -> str:
-    return f"dhanground-{task}"
+    """One notebook for every task: a Kaggle secret is attached per notebook, so the user attaches HF_TOKEN once."""
+    return "dhanground-gpu"
 
 
 def build_kernel(task: str, sha: str, user: str, kaggle_user: str, folder: Path) -> Path:
@@ -149,11 +150,11 @@ def stage(task: str) -> None:
         print(f"staged {src} -> {repo}/{dst}")
 
 
-def push(task: str) -> None:
+def push(task: str, no_run: bool = False) -> None:
     sha, user, kuser = git_sha(), hf_user(), kaggle_user()
     with tempfile.TemporaryDirectory() as d:
         build_kernel(task, sha, user, kuser, Path(d))
-        print(kaggle("kernels", "push", "-p", d))
+        print(kaggle("kernels", "push", "-p", d, *(["--no-run"] if no_run else [])))
     print(f"kernel https://www.kaggle.com/code/{kuser}/{kernel_slug(task)} at {sha[:7]} (fp16, {SHAPE})")
 
 
@@ -161,11 +162,12 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("command", choices=["stage", "push", "status", "logs"])
     ap.add_argument("task", choices=sorted(TASKS))
+    ap.add_argument("--no-run", action="store_true", help="save the notebook without running it (to attach secrets)")
     a = ap.parse_args()
     if a.command == "stage":
         stage(a.task)
     elif a.command == "push":
-        push(a.task)
+        push(a.task, a.no_run)
     elif a.command == "status":
         print(kaggle("kernels", "status", f"{kaggle_user()}/{kernel_slug(a.task)}"))
     else:

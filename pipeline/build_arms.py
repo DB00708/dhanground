@@ -71,15 +71,37 @@ def to_sft(row: dict) -> dict:
     return {"row_id": row["row_id"], "messages": to_sft_messages(row["question"], passages, row)}
 
 
+def _leak_keys(row: dict) -> set[str]:
+    from core.splits import normalize_question
+
+    prov = row["provenance"]
+    spans = {prov["span_sha256"], *(prov.get("span_sha256s") or [])}
+    return {f"span:{s}" for s in spans} | {"q:" + hashlib.sha256(normalize_question(row["question"]).encode()).hexdigest()}
+
+
+def drop_cross_split(rows: list[dict], protected: list[dict]) -> tuple[list[dict], int]:
+    """Drop rows sharing a source paragraph or a normalised question with a higher-priority split.
+
+    Splits are by document, but RBI repeats boilerplate across documents and the teacher can write the same
+    question from two documents; test keeps its rows, dev yields to test, train yields to both.
+    """
+    seen = set().union(*(_leak_keys(r) for r in protected)) if protected else set()
+    kept = [r for r in rows if not (_leak_keys(r) & seen)]
+    return kept, len(rows) - len(kept)
+
+
 def build_arms(n: int, seed: int) -> None:
-    raw = read_jsonl(DATA / "raw" / "train.jsonl")
-    curated = read_jsonl(DATA / "curated" / "train.jsonl")
+    test = read_jsonl(DATA / "curated" / "test.jsonl")
+    dev, d_dev = drop_cross_split(read_jsonl(DATA / "curated" / "dev.jsonl"), test)
+    raw, d_raw = drop_cross_split(read_jsonl(DATA / "raw" / "train.jsonl"), test + dev)
+    curated, d_cur = drop_cross_split(read_jsonl(DATA / "curated" / "train.jsonl"), test + dev)
+    if d_dev or d_raw or d_cur:
+        print(f"dropped cross-split duplicates: dev {d_dev}, raw train {d_raw}, curated train {d_cur}")
     targets = stratified_targets(raw, n)
     a1 = sample_to(raw, targets, random.Random(seed), "A1 raw pool")
     a2 = sample_to(curated, targets, random.Random(seed), "A2 curated pool")
-    dev = read_jsonl(DATA / "curated" / "dev.jsonl")
-    check_no_overlap(a1 + dev + read_jsonl(DATA / "curated" / "test.jsonl"))
-    check_no_overlap(a2 + dev + read_jsonl(DATA / "curated" / "test.jsonl"))
+    check_no_overlap(a1 + dev + test)
+    check_no_overlap(a2 + dev + test)
     for arm, rows in (("A1", a1), ("A2", a2)):
         write_jsonl(DATA / "arms" / arm / "train.jsonl", [to_sft(r) for r in rows])
         write_jsonl(DATA / "arms" / arm / "rows.jsonl", rows)

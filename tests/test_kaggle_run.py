@@ -50,3 +50,11 @@ def test_stage_dir_is_private_and_trims_smoke(tmp_path, monkeypatch):
     assert len((out / "smoke/train.jsonl").read_text().splitlines()) == 400
     assert len((out / "arms/A2/train.jsonl").read_text().splitlines()) == 1000
     assert json.loads((out / "dataset-metadata.json").read_text())["id"] == "kuser/dhanground-work"
+
+
+def test_p100_copy_is_its_own_notebook_and_runs_steps_in_sequence(tmp_path):
+    build_kernel("sft-seed0", "b" * 40, "kuser", tmp_path, p100=True)
+    meta = json.loads((tmp_path / "kernel-metadata.json").read_text())
+    assert meta["id"] == "kuser/dhanground-gpu-p100" and meta["machine_shape"] == "NvidiaTeslaP100"
+    script = (tmp_path / "run.py").read_text()
+    assert '\\"parallel\\": false' in script or '"parallel": false' in script

@@ -26,6 +26,8 @@ DATASET = "dhanground-work"
 BASE_MODEL_SOURCE = "cohere-labs/tiny-aya/transformers/fire/1"
 NOTEBOOK = "dhanground-gpu"
 SHAPE = "NvidiaTeslaT4"
+# A single-P100 copy (own notebook slug) runs the same steps one after another; it often gets a GPU sooner.
+P100 = {"notebook": NOTEBOOK + "-p100", "shape": "NvidiaTeslaP100"}
 SMOKE_ROWS = 400
 STAGE = {"data/raw/train.jsonl": "smoke/train.jsonl",
          "data/arms/A1/train.jsonl": "arms/A1/train.jsonl",
@@ -117,14 +119,15 @@ def git_sha() -> str:
     return sha
 
 
-def build_kernel(task: str, sha: str, kuser: str, folder: Path) -> Path:
+def build_kernel(task: str, sha: str, kuser: str, folder: Path, p100: bool = False) -> Path:
     t = TASKS[task]
-    cfg = {"repo_url": REPO_URL, "sha": sha, "dataset": f"{kuser}/{DATASET}", "parallel": t["parallel"],
+    notebook, shape = (P100["notebook"], P100["shape"]) if p100 else (NOTEBOOK, SHAPE)
+    cfg = {"repo_url": REPO_URL, "sha": sha, "dataset": f"{kuser}/{DATASET}", "parallel": t["parallel"] and not p100,
            "pre": t.get("pre", []), "steps": t["steps"]}
     (folder / "run.py").write_text(KERNEL_SCRIPT.replace("__CFG__", repr(json.dumps(cfg))), encoding="utf-8")
-    meta = {"id": f"{kuser}/{NOTEBOOK}", "title": NOTEBOOK, "code_file": "run.py", "language": "python",
+    meta = {"id": f"{kuser}/{notebook}", "title": notebook, "code_file": "run.py", "language": "python",
             "kernel_type": "script", "is_private": True, "enable_gpu": True, "enable_tpu": False,
-            "enable_internet": True, "machine_shape": SHAPE, "dataset_sources": [f"{kuser}/{DATASET}"],
+            "enable_internet": True, "machine_shape": shape, "dataset_sources": [f"{kuser}/{DATASET}"],
             "competition_sources": [], "kernel_sources": [], "model_sources": [BASE_MODEL_SOURCE]}
     (folder / "kernel-metadata.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     return folder
@@ -164,18 +167,20 @@ def stage() -> None:
     raise SystemExit(f"dataset not ready after 10 minutes: {status}")
 
 
-def push(task: str, no_run: bool = False) -> None:
+def push(task: str, no_run: bool = False, p100: bool = False) -> None:
     sha, kuser = git_sha(), kaggle_user()
     with tempfile.TemporaryDirectory() as d:
-        build_kernel(task, sha, kuser, Path(d))
+        build_kernel(task, sha, kuser, Path(d), p100)
         print(kaggle("kernels", "push", "-p", d, *(["--no-run"] if no_run else [])))
-    print(f"notebook https://www.kaggle.com/code/{kuser}/{NOTEBOOK}: {task} at {sha[:7]} (fp16, {SHAPE})")
+    nb, shape = (P100["notebook"], P100["shape"]) if p100 else (NOTEBOOK, SHAPE)
+    print(f"notebook https://www.kaggle.com/code/{kuser}/{nb}: {task} at {sha[:7]} (fp16, {shape})")
 
 
-def logs(task: str) -> None:
-    out = Path("data/kaggle") / task
+def logs(task: str, p100: bool = False) -> None:
+    nb = P100["notebook"] if p100 else NOTEBOOK
+    out = Path("data/kaggle") / (task + ("-p100" if p100 else ""))
     out.mkdir(parents=True, exist_ok=True)
-    print(kaggle("kernels", "output", f"{kaggle_user()}/{NOTEBOOK}", "-p", str(out), "-o"))
+    print(kaggle("kernels", "output", f"{kaggle_user()}/{nb}", "-p", str(out), "-o"))
     for f in sorted(out.glob("*.log")):
         print(f"--- {f.name}\n" + f.read_text(encoding="utf-8", errors="replace")[-4000:])
 
@@ -185,17 +190,18 @@ def main() -> None:
     ap.add_argument("command", choices=["stage", "push", "status", "logs"])
     ap.add_argument("task", nargs="?", choices=sorted(TASKS))
     ap.add_argument("--no-run", action="store_true", help="save the notebook without running it")
+    ap.add_argument("--p100", action="store_true", help="use the single-P100 notebook copy (steps run one after another)")
     a = ap.parse_args()
     if a.command == "stage":
         stage()
     elif a.command == "status":
-        print(kaggle("kernels", "status", f"{kaggle_user()}/{NOTEBOOK}"))
+        print(kaggle("kernels", "status", f"{kaggle_user()}/{P100['notebook'] if a.p100 else NOTEBOOK}"))
     elif not a.task:
         raise SystemExit(f"{a.command} needs a task: {sorted(TASKS)}")
     elif a.command == "push":
-        push(a.task, a.no_run)
+        push(a.task, a.no_run, a.p100)
     else:
-        logs(a.task)
+        logs(a.task, a.p100)
 
 
 if __name__ == "__main__":
